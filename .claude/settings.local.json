@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la \"D:\\\\Documents\\\\Repo\\\\blender_bone2armature\\\\blender_bone2armature\"\" 2>/dev/null || ls -la \"/d/Documents/Repo/blender_bone2armature/blender_bone2armature/ \")",
+      "Bash(find D:DocumentsRepoblender_bone_util -type f -name *.md -o -name *.txt -o -name *.rst)"
+    ]
+  }
+}
