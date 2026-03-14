@@ -35,6 +35,14 @@ class BoneUtilProperties(PropertyGroup):
         ),
         default=False,
     )
+    auto_bone_orientation: BoolProperty(
+        name="Auto Bone Orientation",
+        description=(
+            "Recalculate bone rolls on the reduced armature so the local Z axis "
+            "aligns with global +Z (same as FBX import 'Automatic Bone Orientation')"
+        ),
+        default=False,
+    )
     # JSON-serialised list of weighted bone names, cached for Extract operator
     last_weighted_bones: StringProperty(default="[]")
 

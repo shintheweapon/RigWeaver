@@ -187,6 +187,12 @@ class BONE_OT_extract_used_armature(Operator):
 
             new_bone_map[name] = new_eb
 
+        # --- Auto bone orientation (optional) ---
+        if props.auto_bone_orientation:
+            for eb in new_arm_data.edit_bones:
+                eb.select = True
+            bpy.ops.armature.calculate_roll(type='GLOBAL_POS_Z')
+
         # --- Return to Object Mode ---
         bpy.ops.object.mode_set(mode='OBJECT')
 

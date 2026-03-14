@@ -47,6 +47,7 @@ class VIEW3D_PT_bone_util(Panel):
             row.label(text="Requires Object Mode", icon='INFO')
         else:
             box.prop(props, "retarget_meshes")
+            box.prop(props, "auto_bone_orientation")
             sub = box.column()
             sub.label(text="Re-analyses if no cache.", icon='INFO')
             row = box.row()
