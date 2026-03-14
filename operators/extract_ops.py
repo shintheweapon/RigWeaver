@@ -230,6 +230,14 @@ class BONE_OT_extract_used_armature(Operator):
                     if mod.type == 'ARMATURE' and mod.object == source_obj:
                         mod.object = new_obj
                         retarget_count += 1
+                        # Also reparent the mesh if it is currently parented
+                        # to the source armature, preserving world transform.
+                        if obj.parent == source_obj:
+                            world_mat = obj.matrix_world.copy()
+                            obj.parent = new_obj
+                            obj.matrix_parent_inverse = (
+                                new_obj.matrix_world.inverted() @ world_mat
+                            )
                         break
             if retarget_count:
                 self.report(
