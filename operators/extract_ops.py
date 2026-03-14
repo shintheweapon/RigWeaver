@@ -13,6 +13,7 @@ import json
 
 import bpy
 from bpy.types import Operator
+from mathutils import Vector
 
 from .analyze_ops import _collect_weighted_names
 
@@ -188,10 +189,26 @@ class BONE_OT_extract_used_armature(Operator):
             new_bone_map[name] = new_eb
 
         # --- Auto bone orientation (optional) ---
+        # Matches Blender FBX import "Automatic Bone Orientation":
+        # Step 1: point non-end bone tails toward the average child head position.
+        # Step 2: recalculate roll so local Z aligns with global +Z.
         if props.auto_bone_orientation:
+            for name, new_eb in new_bone_map.items():
+                children = [c for c in new_arm_data.edit_bones if c.parent == new_eb]
+                if not children:
+                    continue
+                avg_child_head = sum(
+                    (c.head for c in children), Vector((0.0, 0.0, 0.0))
+                ) / len(children)
+                direction = avg_child_head - new_eb.head
+                if direction.length > 1e-6:
+                    bone_len = (new_eb.tail - new_eb.head).length
+                    new_eb.tail = new_eb.head + direction.normalized() * bone_len
+
             for eb in new_arm_data.edit_bones:
                 eb.select = True
-            bpy.ops.armature.calculate_roll(type='GLOBAL_POS_Z')
+            with context.temp_override(active_object=new_obj):
+                bpy.ops.armature.calculate_roll(type='GLOBAL_POS_Z')
 
         # --- Return to Object Mode ---
         bpy.ops.object.mode_set(mode='OBJECT')
