@@ -151,6 +151,7 @@ class BONE_OT_extract_used_armature(Operator):
         new_obj.rotation_euler = source_obj.rotation_euler.copy()
         new_obj.rotation_quaternion = source_obj.rotation_quaternion.copy()
         new_obj.scale = source_obj.scale.copy()
+        new_obj.show_in_front = True
 
         # --- Populate bones in Edit Mode on the new armature ---
         bpy.ops.object.select_all(action='DESELECT')
