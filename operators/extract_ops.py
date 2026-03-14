@@ -190,10 +190,12 @@ class BONE_OT_extract_used_armature(Operator):
             new_bone_map[name] = new_eb
 
         # --- Auto bone orientation (optional) ---
-        # Matches Blender FBX import "Automatic Bone Orientation":
-        # Step 1: point non-end bone tails toward the average child head position.
-        # Step 2: recalculate roll so local Z aligns with global +Z.
+        # Matches Blender FBX import "Automatic Bone Orientation".
+        # Step 1: non-end bones → tail toward average child head.
+        # Step 2: end bones with a parent → inherit parent's corrected direction.
+        # Step 3: recalculate roll so local Z aligns with global +Z.
         if props.auto_bone_orientation:
+            # Step 1: non-end bones
             for name, new_eb in new_bone_map.items():
                 children = [c for c in new_arm_data.edit_bones if c.parent == new_eb]
                 if not children:
@@ -206,6 +208,17 @@ class BONE_OT_extract_used_armature(Operator):
                     bone_len = (new_eb.tail - new_eb.head).length
                     new_eb.tail = new_eb.head + direction.normalized() * bone_len
 
+            # Step 2: end bones — inherit parent's already-corrected direction
+            for name, new_eb in new_bone_map.items():
+                children = [c for c in new_arm_data.edit_bones if c.parent == new_eb]
+                if children or not new_eb.parent:
+                    continue  # not an end bone, or no parent to inherit from
+                parent_dir = new_eb.parent.tail - new_eb.parent.head
+                if parent_dir.length > 1e-6:
+                    bone_len = (new_eb.tail - new_eb.head).length
+                    new_eb.tail = new_eb.head + parent_dir.normalized() * bone_len
+
+            # Step 3: recalculate rolls
             for eb in new_arm_data.edit_bones:
                 eb.select = True
             with context.temp_override(active_object=new_obj):
