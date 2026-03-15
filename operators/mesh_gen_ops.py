@@ -285,8 +285,12 @@ class BONE_OT_generate_mesh(Operator):
         if len(chains) == 1:
             # Single chain → ribbon using bone local X axis for width
             _ribbon_from_chain(chains[0], props.mesh_ribbon_width, all_verts, all_faces)
+        elif props.mesh_individual_chains:
+            # Individual mode → one ribbon per chain, all merged
+            for chain in chains:
+                _ribbon_from_chain(chain, props.mesh_ribbon_width, all_verts, all_faces)
         else:
-            # Multiple chains → sort angularly, then cross-section mesh.
+            # Connected mode → cross-section surface between adjacent chains.
             # Use the shared parent bone as the sort axis when all chains
             # have the same immediate parent (skirt / hair); fall back to
             # centroid-based sorting otherwise.

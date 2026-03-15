@@ -48,6 +48,7 @@ class VIEW3D_PT_bone_util(Panel):
             row.label(text="Requires Pose Mode", icon='INFO')
             box.operator("object.mode_set", text="Enter Pose Mode", icon='POSE_HLT').mode = 'POSE'
         else:
+            box.prop(props, "mesh_individual_chains")
             box.prop(props, "close_mesh_loop")
             box.prop(props, "mesh_panel_resolution")
             box.prop(props, "mesh_ribbon_width")

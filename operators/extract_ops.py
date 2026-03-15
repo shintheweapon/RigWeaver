@@ -38,6 +38,14 @@ class BoneUtilProperties(PropertyGroup):
         ),
         default=False,
     )
+    mesh_individual_chains: BoolProperty(
+        name="Individual Chains",
+        description=(
+            "Generate a separate ribbon strip for each chain instead of a "
+            "connected cross-section surface (ignored for single-chain selections)"
+        ),
+        default=False,
+    )
     close_mesh_loop: BoolProperty(
         name="Close Loop",
         description="Connect last chain back to first (for skirts / rings)",
