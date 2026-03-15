@@ -234,22 +234,23 @@ class BONE_OT_generate_mesh(Operator):
             # Single chain → ribbon using bone local X axis for width
             _ribbon_from_chain(chains[0], props.mesh_ribbon_width, all_verts, all_faces)
         else:
-            # Multiple chains → sort angularly per group, then cross-section mesh
-            groups: dict = {}
-            for chain in chains:
-                key_bone = chain[0].parent
-                key = key_bone.name if key_bone else "__root__"
-                groups.setdefault(key, (key_bone, []))
-                groups[key][1].append(chain)
-
-            for _key, (parent_bone, group_chains) in groups.items():
-                sorted_chains = _sort_chains(group_chains, parent_bone)
-                _cross_section_mesh(
-                    sorted_chains,
-                    props.close_mesh_loop,
-                    all_verts,
-                    all_faces,
-                )
+            # Multiple chains → sort angularly, then cross-section mesh.
+            # Use the shared parent bone as the sort axis when all chains
+            # have the same immediate parent (skirt / hair); fall back to
+            # centroid-based sorting otherwise.
+            first_parent = chains[0][0].parent
+            common_parent = (
+                first_parent
+                if all(c[0].parent == first_parent for c in chains)
+                else None
+            )
+            sorted_chains = _sort_chains(chains, common_parent)
+            _cross_section_mesh(
+                sorted_chains,
+                props.close_mesh_loop,
+                all_verts,
+                all_faces,
+            )
 
         if not all_faces:
             self.report({'ERROR'}, "ArmExt: No geometry could be generated.")
