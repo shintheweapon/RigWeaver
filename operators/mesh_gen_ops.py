@@ -122,75 +122,127 @@ def _ribbon_from_chain(
         face_list.append((r0, r1, l1, l0))
 
 
+def _interpolate_levels(
+    levels_A: list[Vector],
+    levels_B: list[Vector],
+    resolution: int,
+) -> list[list[Vector]]:
+    """
+    Return (resolution - 1) intermediate level-lists linearly interpolated
+    between levels_A and levels_B.  resolution=1 returns [].
+
+    When one list is shorter, its last position is reused for missing depths
+    so that dropout tapering is preserved in interpolated columns.
+    """
+    if resolution <= 1:
+        return []
+
+    max_depth = max(len(levels_A), len(levels_B))
+
+    def _pos(levels: list[Vector], d: int) -> Vector:
+        return levels[d] if d < len(levels) else levels[-1]
+
+    result: list[list[Vector]] = []
+    for step in range(1, resolution):
+        t = step / resolution
+        result.append([_pos(levels_A, d).lerp(_pos(levels_B, d), t)
+                        for d in range(max_depth)])
+    return result
+
+
+def _fill_columns(
+    all_columns: list[list[Vector]],
+    real_len_left: int,
+    real_len_right: int,
+    vert_list: list[Vector],
+    face_list: list[tuple[int, ...]],
+) -> None:
+    """
+    Build vertices and faces for a sequence of level-columns.
+
+    all_columns: ordered list of level-position lists (first = left real chain,
+                 last = right real chain, middle = interpolated).
+    real_len_left / real_len_right: bone-count of the two bounding real chains,
+        used to determine dropout depth for each column.
+    """
+    n_cols = len(all_columns)
+    max_depth = max(len(c) for c in all_columns)
+
+    # Build local vertex map: (col_idx, depth) → index in vert_list
+    col_vert_map: dict[tuple[int, int], int] = {}
+    for ci, col in enumerate(all_columns):
+        for d, pos in enumerate(col):
+            col_vert_map[(ci, d)] = len(vert_list)
+            vert_list.append(pos)
+
+    for ci in range(n_cols - 1):
+        len_left  = len(all_columns[ci])
+        len_right = len(all_columns[ci + 1])
+
+        for d in range(max_depth):
+            l_curr = d <= len_left - 1
+            r_curr = d <= len_right - 1
+            l_next = (d + 1) <= len_left - 1
+            r_next = (d + 1) <= len_right - 1
+
+            if not l_curr or not r_curr:
+                continue
+
+            if l_next and r_next:
+                face_list.append((
+                    col_vert_map[(ci, d)],
+                    col_vert_map[(ci + 1, d)],
+                    col_vert_map[(ci + 1, d + 1)],
+                    col_vert_map[(ci, d + 1)],
+                ))
+            elif l_next:
+                face_list.append((
+                    col_vert_map[(ci, d)],
+                    col_vert_map[(ci + 1, d)],
+                    col_vert_map[(ci, d + 1)],
+                ))
+            elif r_next:
+                face_list.append((
+                    col_vert_map[(ci, d)],
+                    col_vert_map[(ci + 1, d)],
+                    col_vert_map[(ci + 1, d + 1)],
+                ))
+
+
 def _cross_section_mesh(
     chains: list[list],
     close_loop: bool,
+    resolution: int,
     vert_list: list[Vector],
     face_list: list[tuple[int, ...]],
 ) -> None:
     """
     Build a connected cross-section mesh from multiple chains of any length.
 
-    Each chain contributes one vertex per depth level (bone heads + last tail).
-    Adjacent chain pairs are connected with quads at each level.  When one
-    chain of a pair ends before the other, a collapse triangle is emitted
-    instead so shorter chains taper cleanly rather than leaving gaps.
+    Each adjacent chain pair is expanded into `resolution` columns by linear
+    interpolation, giving denser geometry for simulation without changing shape.
+    Shorter chains taper with collapse triangles at their dropout depth.
 
-    close_loop: if True, also connects the last chain back to the first
-    (for cylindrical surfaces like skirts).
+    close_loop: connect last chain back to first (cylindrical surfaces).
+    resolution: quad columns per panel (1 = one column, default 2+).
     """
     N = len(chains)
-
-    # Build vertex table: vert_map[(chain_idx, level)] = index in vert_list
-    vert_map: dict[tuple[int, int], int] = {}
-    for i, chain in enumerate(chains):
-        for l, pos in enumerate(_chain_levels(chain)):
-            vert_map[(i, l)] = len(vert_list)
-            vert_list.append(pos)
-
-    max_level = max(len(c) for c in chains)
-
-    # Determine which adjacent pairs to process
     pairs = [(i, i + 1) for i in range(N - 1)]
     if close_loop and N >= 3:
         pairs.append((N - 1, 0))
 
     for i, j in pairs:
-        len_i = len(chains[i])
-        len_j = len(chains[j])
-
-        for l in range(max_level):
-            i_curr = l <= len_i       # chain i has a vertex at level l
-            j_curr = l <= len_j       # chain j has a vertex at level l
-            i_next = (l + 1) <= len_i  # chain i has a vertex at level l+1
-            j_next = (l + 1) <= len_j  # chain j has a vertex at level l+1
-
-            if not i_curr or not j_curr:
-                continue  # at least one chain has no vertex at this level
-
-            if i_next and j_next:
-                # Both chains continue → quad
-                face_list.append((
-                    vert_map[(i, l)],
-                    vert_map[(j, l)],
-                    vert_map[(j, l + 1)],
-                    vert_map[(i, l + 1)],
-                ))
-            elif i_next and not j_next:
-                # Chain j ends at l → collapse triangle
-                face_list.append((
-                    vert_map[(i, l)],
-                    vert_map[(j, l)],
-                    vert_map[(i, l + 1)],
-                ))
-            elif j_next and not i_next:
-                # Chain i ends at l → collapse triangle
-                face_list.append((
-                    vert_map[(i, l)],
-                    vert_map[(j, l)],
-                    vert_map[(j, l + 1)],
-                ))
-            # Both end at l: no face needed
+        levels_i = _chain_levels(chains[i])
+        levels_j = _chain_levels(chains[j])
+        interpolated = _interpolate_levels(levels_i, levels_j, resolution)
+        all_columns = [levels_i] + interpolated + [levels_j]
+        _fill_columns(
+            all_columns,
+            len(chains[i]),
+            len(chains[j]),
+            vert_list,
+            face_list,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -248,6 +300,7 @@ class BONE_OT_generate_mesh(Operator):
             _cross_section_mesh(
                 sorted_chains,
                 props.close_mesh_loop,
+                props.mesh_panel_resolution,
                 all_verts,
                 all_faces,
             )

@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 
 import bpy
-from bpy.props import BoolProperty, FloatProperty, StringProperty
+from bpy.props import BoolProperty, FloatProperty, IntProperty, StringProperty
 from bpy.types import Operator, PropertyGroup
 from mathutils import Vector
 
@@ -42,6 +42,16 @@ class BoneUtilProperties(PropertyGroup):
         name="Close Loop",
         description="Connect last chain back to first (for skirts / rings)",
         default=False,
+    )
+    mesh_panel_resolution: IntProperty(
+        name="Panel Resolution",
+        description=(
+            "Number of quad columns per panel between adjacent chains. "
+            "1 = one column, 2+ = interpolated columns for denser simulation mesh"
+        ),
+        default=2,
+        min=1,
+        max=16,
     )
     mesh_ribbon_width: FloatProperty(
         name="Ribbon Width",
