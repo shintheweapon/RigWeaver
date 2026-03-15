@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 
 import bpy
-from bpy.props import BoolProperty, StringProperty
+from bpy.props import BoolProperty, FloatProperty, IntProperty, StringProperty
 from bpy.types import Operator, PropertyGroup
 from mathutils import Vector
 
@@ -37,6 +37,50 @@ class BoneUtilProperties(PropertyGroup):
             "aligns with global +Z (same as FBX import 'Automatic Bone Orientation')"
         ),
         default=False,
+    )
+    mesh_individual_chains: BoolProperty(
+        name="Individual Chains",
+        description=(
+            "Generate a separate ribbon strip for each chain instead of a "
+            "connected cross-section surface (ignored for single-chain selections)"
+        ),
+        default=False,
+    )
+    mesh_split_objects: BoolProperty(
+        name="Separate Objects",
+        description=(
+            "Create one mesh object per chain instead of merging all ribbons "
+            "into a single object (only active when Individual Chains is on)"
+        ),
+        default=False,
+    )
+    mesh_triangulate: BoolProperty(
+        name="Triangulate",
+        description="Convert all quad faces to triangles in the generated mesh",
+        default=False,
+    )
+    close_mesh_loop: BoolProperty(
+        name="Close Loop",
+        description="Connect last chain back to first (for skirts / rings)",
+        default=False,
+    )
+    mesh_panel_resolution: IntProperty(
+        name="Panel Resolution",
+        description=(
+            "Number of quad columns per panel between adjacent chains. "
+            "1 = one column, 2+ = interpolated columns for denser simulation mesh"
+        ),
+        default=2,
+        min=1,
+        max=16,
+    )
+    mesh_ribbon_width: FloatProperty(
+        name="Ribbon Width",
+        description="Width of the ribbon mesh generated from a single bone chain",
+        default=0.1,
+        min=0.001,
+        soft_max=1.0,
+        unit='LENGTH',
     )
     # JSON-serialised list of weighted bone names, cached between runs
     last_weighted_bones: StringProperty(default="[]")
