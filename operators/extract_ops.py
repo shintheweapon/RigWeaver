@@ -46,6 +46,19 @@ class BoneUtilProperties(PropertyGroup):
         ),
         default=False,
     )
+    mesh_split_objects: BoolProperty(
+        name="Separate Objects",
+        description=(
+            "Create one mesh object per chain instead of merging all ribbons "
+            "into a single object (only active when Individual Chains is on)"
+        ),
+        default=False,
+    )
+    mesh_triangulate: BoolProperty(
+        name="Triangulate",
+        description="Convert all quad faces to triangles in the generated mesh",
+        default=False,
+    )
     close_mesh_loop: BoolProperty(
         name="Close Loop",
         description="Connect last chain back to first (for skirts / rings)",

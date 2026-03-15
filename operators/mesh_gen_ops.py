@@ -77,15 +77,36 @@ def _sort_chains(chains: list[list], parent_bone) -> list[list]:
     y = z.cross(x).normalized()
 
     def angle_key(chain):
-        delta = Vector(chain[0].head) - origin
+        # Use tail of the first bone so that connected bones (whose heads
+        # all share the parent tail position) still produce distinct angles.
+        delta = Vector(chain[0].tail) - origin
         return math.atan2(delta.dot(y), delta.dot(x))
 
-    return sorted(chains, key=angle_key)
+    ordered = sorted(chains, key=angle_key)
+
+    # For a partial arc the largest gap is the natural seam.  Rotate the list so
+    # the seam sits at the wrap-around boundary, keeping the arc in correct order.
+    angles = [angle_key(c) for c in ordered]
+    n = len(ordered)
+    gaps = [(angles[(i + 1) % n] - angles[i]) % (2 * math.pi) for i in range(n)]
+    start = (max(range(n), key=lambda i: gaps[i]) + 1) % n
+    return ordered[start:] + ordered[:start]
 
 
 def _chain_levels(chain: list) -> list[Vector]:
-    """Return N+1 world-space positions for an N-bone chain."""
-    return [Vector(b.head) for b in chain] + [Vector(chain[-1].tail)]
+    """
+    Return N+1 world-space positions for the cross-section mesh rows.
+
+    Top row:    0.5 bone-lengths before the first bone's root (extends outward).
+    Bottom row: 0.5 bone-lengths past  the last  bone's tip  (extends outward).
+    Middle rows: tail positions between consecutive bones (unchanged).
+    """
+    v_first = Vector(chain[0].tail)  - Vector(chain[0].head)
+    v_last  = Vector(chain[-1].tail) - Vector(chain[-1].head)
+    ext_top    = Vector(chain[0].head)  - v_first * 0.5
+    ext_bottom = Vector(chain[-1].tail) + v_last  * 0.5
+    junctions  = [Vector(b.tail) for b in chain[:-1]]   # tail[0] … tail[N-2]
+    return [ext_top] + junctions + [ext_bottom]
 
 
 def _ribbon_from_chain(
@@ -219,30 +240,93 @@ def _cross_section_mesh(
     """
     Build a connected cross-section mesh from multiple chains of any length.
 
-    Each adjacent chain pair is expanded into `resolution` columns by linear
-    interpolation, giving denser geometry for simulation without changing shape.
-    Shorter chains taper with collapse triangles at their dropout depth.
+    Each chain owns one panel centred on itself.  Panel boundaries are at the
+    midpoint between the chain and each neighbour; outer boundaries are
+    extrapolated by the same half-step outward.  This gives N panels for N
+    chains (vs N-1 in an edge-aligned scheme) and each bone runs through the
+    centre of its panel — matching the single-chain ribbon behaviour.
 
-    close_loop: connect last chain back to first (cylindrical surfaces).
+    close_loop: connect last chain back to first (cylindrical surfaces, N≥3).
     resolution: quad columns per panel (1 = one column, default 2+).
     """
     N = len(chains)
-    pairs = [(i, i + 1) for i in range(N - 1)]
-    if close_loop and N >= 3:
-        pairs.append((N - 1, 0))
+    all_levels = [_chain_levels(c) for c in chains]
+    use_loop = close_loop and N >= 3
 
-    for i, j in pairs:
-        levels_i = _chain_levels(chains[i])
-        levels_j = _chain_levels(chains[j])
-        interpolated = _interpolate_levels(levels_i, levels_j, resolution)
-        all_columns = [levels_i] + interpolated + [levels_j]
-        _fill_columns(
-            all_columns,
-            len(chains[i]),
-            len(chains[j]),
-            vert_list,
-            face_list,
-        )
+    def _pos(levels, d):
+        return levels[d] if d < len(levels) else levels[-1]
+
+    def _mid_col(LA, LB, depth):
+        """Midpoint column between two level-lists, truncated to `depth`."""
+        return [(_pos(LA, d) + _pos(LB, d)) * 0.5 for d in range(depth)]
+
+    def _extrap_col(L_inner, L_outer, depth):
+        """Extrapolate half a step outward from L_inner away from L_outer."""
+        return [_pos(L_inner, d) * 1.5 - _pos(L_outer, d) * 0.5
+                for d in range(depth)]
+
+    for i in range(N):
+        depth = len(all_levels[i])
+
+        if use_loop:
+            left_col  = _mid_col(all_levels[(i - 1) % N], all_levels[i],            depth)
+            right_col = _mid_col(all_levels[i],            all_levels[(i + 1) % N],  depth)
+        else:
+            left_col  = (_extrap_col(all_levels[0],     all_levels[1],     depth)
+                         if i == 0
+                         else _mid_col(all_levels[i - 1], all_levels[i],   depth))
+            right_col = (_extrap_col(all_levels[N - 1], all_levels[N - 2], depth)
+                         if i == N - 1
+                         else _mid_col(all_levels[i],   all_levels[i + 1], depth))
+
+        interpolated = _interpolate_levels(left_col, right_col, resolution)
+        all_columns  = [left_col] + interpolated + [right_col]
+        _fill_columns(all_columns, len(chains[i]), len(chains[i]), vert_list, face_list)
+
+
+# ---------------------------------------------------------------------------
+# Triangulation helper
+# ---------------------------------------------------------------------------
+
+def _triangulate_faces(
+    faces: list[tuple[int, ...]],
+) -> list[tuple[int, ...]]:
+    """Split every quad into two triangles; triangles pass through unchanged."""
+    result: list[tuple[int, ...]] = []
+    for f in faces:
+        if len(f) == 4:
+            a, b, c, d = f
+            result.append((a, b, c))
+            result.append((a, c, d))
+        else:
+            result.append(f)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Object creation helper
+# ---------------------------------------------------------------------------
+
+def _create_mesh_object(
+    name: str,
+    verts: list[Vector],
+    faces: list[tuple[int, ...]],
+    source_obj,
+    context,
+) -> "bpy.types.Object":
+    """
+    Create a named mesh object from raw geometry and link it to the same
+    collections as source_obj.  Blender auto-appends .001 / .002 etc. when
+    the name is already taken, so no manual collision handling is needed.
+    """
+    mesh = bpy.data.meshes.new(name)
+    mesh.from_pydata([v.to_tuple() for v in verts], [], faces)
+    mesh.update()
+    obj = bpy.data.objects.new(name, mesh)
+    for coll in source_obj.users_collection:
+        coll.objects.link(obj)
+    obj.matrix_world = Matrix.Identity(4)
+    return obj
 
 
 # ---------------------------------------------------------------------------
@@ -279,6 +363,43 @@ class BONE_OT_generate_mesh(Operator):
             self.report({'ERROR'}, "ArmExt: No chains found in selection.")
             return {'CANCELLED'}
 
+        source_obj = context.object
+
+        # ------------------------------------------------------------------
+        # Individual chains, split into separate objects
+        # ------------------------------------------------------------------
+        if len(chains) > 1 and props.mesh_individual_chains and props.mesh_split_objects:
+            created: list = []
+            for chain in chains:
+                verts: list[Vector] = []
+                faces: list[tuple[int, ...]] = []
+                _ribbon_from_chain(chain, props.mesh_ribbon_width, verts, faces)
+                if props.mesh_triangulate:
+                    faces = _triangulate_faces(faces)
+                if faces:
+                    obj = _create_mesh_object(
+                        f"BoneMesh_{chain[0].name}", verts, faces, source_obj, context
+                    )
+                    created.append(obj)
+
+            if not created:
+                self.report({'ERROR'}, "ArmExt: No geometry could be generated.")
+                return {'CANCELLED'}
+
+            bpy.ops.pose.select_all(action='DESELECT')
+            for obj in created:
+                obj.select_set(True)
+            context.view_layer.objects.active = created[-1]
+
+            self.report(
+                {'INFO'},
+                f"ArmExt: Created {len(created)} object(s) from {len(chains)} chain(s).",
+            )
+            return {'FINISHED'}
+
+        # ------------------------------------------------------------------
+        # All other modes → build into a single combined object
+        # ------------------------------------------------------------------
         all_verts: list[Vector] = []
         all_faces: list[tuple[int, ...]] = []
 
@@ -286,7 +407,7 @@ class BONE_OT_generate_mesh(Operator):
             # Single chain → ribbon using bone local X axis for width
             _ribbon_from_chain(chains[0], props.mesh_ribbon_width, all_verts, all_faces)
         elif props.mesh_individual_chains:
-            # Individual mode → one ribbon per chain, all merged
+            # Individual mode, merged → one ribbon per chain combined
             for chain in chains:
                 _ribbon_from_chain(chain, props.mesh_ribbon_width, all_verts, all_faces)
         else:
@@ -313,16 +434,10 @@ class BONE_OT_generate_mesh(Operator):
             self.report({'ERROR'}, "ArmExt: No geometry could be generated.")
             return {'CANCELLED'}
 
-        # --- Create mesh object ---
-        mesh = bpy.data.meshes.new("BoneMesh")
-        mesh.from_pydata([v.to_tuple() for v in all_verts], [], all_faces)
-        mesh.update()
+        if props.mesh_triangulate:
+            all_faces = _triangulate_faces(all_faces)
 
-        obj = bpy.data.objects.new("BoneMesh", mesh)
-        for coll in context.object.users_collection:
-            coll.objects.link(obj)
-
-        obj.matrix_world = Matrix.Identity(4)
+        obj = _create_mesh_object("BoneMesh", all_verts, all_faces, source_obj, context)
 
         bpy.ops.pose.select_all(action='DESELECT')
         context.view_layer.objects.active = obj
