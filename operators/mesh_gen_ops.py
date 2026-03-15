@@ -11,7 +11,6 @@ for chains of unequal length.
 """
 from __future__ import annotations
 
-import math
 from mathutils import Matrix, Vector
 
 import bpy
@@ -53,44 +52,38 @@ def _build_chains(selected: set) -> list[list]:
 
 def _sort_chains(chains: list[list], parent_bone) -> list[list]:
     """
-    Sort chains by their angular position around the parent bone's axis.
-    When no parent exists, sort by angle around the centroid of chain roots
-    projected onto the XY plane.
+    Order chains by physical adjacency using a nearest-neighbour walk.
+
+    Starting from the chain whose root is furthest from the centroid of all
+    roots (a stable extreme-end seed), each step picks the closest unvisited
+    chain by 3D distance between first-bone tails.  This is robust to wide
+    arcs, partial circles, and any arrangement where atan2 seam detection
+    fails.
+
+    parent_bone is accepted for API compatibility but is no longer used.
     """
     if len(chains) <= 1:
         return chains
 
-    if parent_bone is not None:
-        axis = Vector(parent_bone.tail) - Vector(parent_bone.head)
-        axis = axis.normalized() if axis.length > 1e-6 else Vector((0.0, 0.0, 1.0))
-        origin = Vector(parent_bone.tail)
-    else:
-        axis = Vector((0.0, 0.0, 1.0))
-        roots = [Vector(c[0].head) for c in chains]
-        origin = sum(roots, Vector()) / len(roots)
+    roots = [Vector(c[0].tail) for c in chains]
+    centroid = sum(roots, Vector()) / len(roots)
 
-    z = axis
-    arbitrary = Vector((1.0, 0.0, 0.0))
-    if abs(z.dot(arbitrary)) > 0.99:
-        arbitrary = Vector((0.0, 1.0, 0.0))
-    x = z.cross(arbitrary).normalized()
-    y = z.cross(x).normalized()
+    # Seed from the chain whose root is most distant from the centroid so the
+    # walk always starts at a natural edge of the arrangement.
+    start = max(range(len(chains)), key=lambda i: (roots[i] - centroid).length)
 
-    def angle_key(chain):
-        # Use tail of the first bone so that connected bones (whose heads
-        # all share the parent tail position) still produce distinct angles.
-        delta = Vector(chain[0].tail) - origin
-        return math.atan2(delta.dot(y), delta.dot(x))
+    remaining = list(range(len(chains)))
+    remaining.remove(start)
+    ordered = [chains[start]]
+    last_root = roots[start]
 
-    ordered = sorted(chains, key=angle_key)
+    while remaining:
+        nearest = min(remaining, key=lambda i: (roots[i] - last_root).length)
+        ordered.append(chains[nearest])
+        last_root = roots[nearest]
+        remaining.remove(nearest)
 
-    # For a partial arc the largest gap is the natural seam.  Rotate the list so
-    # the seam sits at the wrap-around boundary, keeping the arc in correct order.
-    angles = [angle_key(c) for c in ordered]
-    n = len(ordered)
-    gaps = [(angles[(i + 1) % n] - angles[i]) % (2 * math.pi) for i in range(n)]
-    start = (max(range(n), key=lambda i: gaps[i]) + 1) % n
-    return ordered[start:] + ordered[:start]
+    return ordered
 
 
 def _chain_levels(chain: list) -> list[Vector]:
