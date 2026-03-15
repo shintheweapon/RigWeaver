@@ -49,7 +49,6 @@ class VIEW3D_PT_bone_util(Panel):
             box.operator("object.mode_set", text="Enter Pose Mode", icon='POSE_HLT').mode = 'POSE'
         else:
             box.prop(props, "mesh_ribbon_width")
-            box.prop(props, "close_mesh_loop")
             row = box.row()
             row.scale_y = 1.3
             row.operator("bone_util.generate_mesh", icon='OUTLINER_OB_MESH')
