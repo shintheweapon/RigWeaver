@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 
 import bpy
-from bpy.props import BoolProperty, StringProperty
+from bpy.props import BoolProperty, FloatProperty, StringProperty
 from bpy.types import Operator, PropertyGroup
 from mathutils import Vector
 
@@ -45,6 +45,14 @@ class BoneUtilProperties(PropertyGroup):
             "(use for skirts / rings)"
         ),
         default=False,
+    )
+    mesh_ribbon_width: FloatProperty(
+        name="Ribbon Width",
+        description="Width of the ribbon mesh generated from a single bone chain",
+        default=0.1,
+        min=0.001,
+        soft_max=1.0,
+        unit='LENGTH',
     )
     # JSON-serialised list of weighted bone names, cached between runs
     last_weighted_bones: StringProperty(default="[]")

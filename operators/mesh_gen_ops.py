@@ -105,6 +105,41 @@ def _sort_chains(chains: list[list], parent_bone) -> list[list]:
     return sorted(chains, key=angle_key)
 
 
+def _ribbon_from_chain(
+    chain: list,
+    width: float,
+    vert_list: list[Vector],
+    face_list: list[tuple[int, ...]],
+) -> None:
+    """
+    Build a flat quad-strip ribbon along a single bone chain.
+
+    Each bone contributes a cross-section at its head; the last bone adds
+    one at its tail too.  Vertices are offset ±half_width along the bone's
+    local X axis (world-space), which is perpendicular to the bone length.
+    """
+    half = width / 2.0
+    base = len(vert_list)
+
+    cross_sections: list[tuple[Vector, Vector]] = [
+        (Vector(b.head), Vector(b.x_axis)) for b in chain
+    ]
+    last = chain[-1]
+    cross_sections.append((Vector(last.tail), Vector(last.x_axis)))
+
+    for pos, x_axis in cross_sections:
+        vert_list.append(pos + x_axis * half)   # right
+        vert_list.append(pos - x_axis * half)   # left
+
+    n = len(cross_sections)
+    for i in range(n - 1):
+        r0 = base + i * 2
+        l0 = base + i * 2 + 1
+        r1 = base + (i + 1) * 2
+        l1 = base + (i + 1) * 2 + 1
+        face_list.append((r0, r1, l1, l0))
+
+
 def _fill_between(
     verts_A: list[Vector],
     verts_B: list[Vector],
@@ -170,36 +205,32 @@ class BONE_OT_generate_mesh(Operator):
             self.report({'ERROR'}, "ArmExt: No chains found in selection.")
             return {'CANCELLED'}
 
-        if len(chains) == 1:
-            self.report(
-                {'WARNING'},
-                "ArmExt: Only one chain selected — cannot fill a surface with a single chain."
-            )
-            return {'CANCELLED'}
-
-        # --- Group chains by their immediate parent bone ---
-        groups: dict = {}
-        for chain in chains:
-            key_bone = chain[0].parent  # may be None
-            key = key_bone.name if key_bone else "__root__"
-            groups.setdefault(key, (key_bone, []))
-            groups[key][1].append(chain)
-
         # --- Build geometry ---
         all_verts: list[Vector] = []
         all_faces: list[tuple[int, ...]] = []
 
-        for key, (parent_bone, group_chains) in groups.items():
-            sorted_chains = _sort_chains(group_chains, parent_bone)
-            chain_verts = [_chain_verts(c) for c in sorted_chains]
+        if len(chains) == 1:
+            # Single chain → flat ribbon using bone local X as width direction
+            _ribbon_from_chain(chains[0], props.mesh_ribbon_width, all_verts, all_faces)
+        else:
+            # Multiple chains → fill the surface between adjacent chains
+            groups: dict = {}
+            for chain in chains:
+                key_bone = chain[0].parent  # may be None
+                key = key_bone.name if key_bone else "__root__"
+                groups.setdefault(key, (key_bone, []))
+                groups[key][1].append(chain)
 
-            # Fill between each consecutive pair
-            pairs = list(zip(chain_verts, chain_verts[1:]))
-            if props.close_mesh_loop and len(chain_verts) >= 3:
-                pairs.append((chain_verts[-1], chain_verts[0]))
+            for key, (parent_bone, group_chains) in groups.items():
+                sorted_chains = _sort_chains(group_chains, parent_bone)
+                chain_verts = [_chain_verts(c) for c in sorted_chains]
 
-            for verts_A, verts_B in pairs:
-                _fill_between(verts_A, verts_B, all_verts, all_faces)
+                pairs = list(zip(chain_verts, chain_verts[1:]))
+                if props.close_mesh_loop and len(chain_verts) >= 3:
+                    pairs.append((chain_verts[-1], chain_verts[0]))
+
+                for verts_A, verts_B in pairs:
+                    _fill_between(verts_A, verts_B, all_verts, all_faces)
 
         if not all_faces:
             self.report({'ERROR'}, "ArmExt: No geometry could be generated.")
