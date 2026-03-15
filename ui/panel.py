@@ -75,6 +75,7 @@ class VIEW3D_PT_vg_select(Panel):
                 and context.object.mode == 'EDIT')
 
     def draw(self, context):
+        import json
         layout = self.layout
         obj = context.object
 
@@ -82,25 +83,23 @@ class VIEW3D_PT_vg_select(Panel):
             layout.label(text="No vertex groups", icon='INFO')
             return
 
-        # Reconcile: add items for vertex groups not yet tracked.
-        existing = {item.name for item in obj.vg_selection_items}
-        for vg in obj.vertex_groups:
-            if vg.name not in existing:
-                item = obj.vg_selection_items.add()
-                item.name = vg.name
+        # Read-only: no data mutations here.
+        selected: set[str] = set(json.loads(obj.vg_selected_groups))
 
         # All / None bulk buttons.
         row = layout.row(align=True)
         row.operator("bone_util.vg_select_all",  text="All")
         row.operator("bone_util.vg_select_none", text="None")
 
-        # Per-group checkboxes, ordered as Blender lists them.
+        # Per-group toggle buttons with checkbox icons.
         col = layout.column(align=True)
-        item_map = {item.name: item for item in obj.vg_selection_items}
         for vg in obj.vertex_groups:
-            item = item_map.get(vg.name)
-            if item is not None:
-                col.prop(item, "selected", text=vg.name)
+            icon = 'CHECKBOX_HLT' if vg.name in selected else 'CHECKBOX_DEHLT'
+            col.operator(
+                "bone_util.vg_toggle",
+                text=vg.name,
+                icon=icon,
+            ).group_name = vg.name
 
 
 def register():
