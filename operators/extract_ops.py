@@ -38,6 +38,14 @@ class BoneUtilProperties(PropertyGroup):
         ),
         default=False,
     )
+    close_mesh_loop: BoolProperty(
+        name="Close Loop",
+        description=(
+            "Connect the last chain back to the first when generating a bone mesh "
+            "(use for skirts / rings)"
+        ),
+        default=False,
+    )
     # JSON-serialised list of weighted bone names, cached between runs
     last_weighted_bones: StringProperty(default="[]")
 

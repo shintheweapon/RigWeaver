@@ -37,6 +37,22 @@ class VIEW3D_PT_bone_util(Panel):
             row.scale_y = 1.3
             row.operator("bone_util.extract_used_armature", icon='LINKED')
 
+        layout.separator()
+
+        # ── Generate Mesh ──────────────────────────────────────────────────
+        box = layout.box()
+        box.label(text="Generate Mesh", icon='MESH_DATA')
+
+        if mode != 'POSE':
+            row = box.row(align=True)
+            row.label(text="Requires Pose Mode", icon='INFO')
+            box.operator("object.mode_set", text="Enter Pose Mode", icon='POSE_HLT').mode = 'POSE'
+        else:
+            box.prop(props, "close_mesh_loop")
+            row = box.row()
+            row.scale_y = 1.3
+            row.operator("bone_util.generate_mesh", icon='OUTLINER_OB_MESH')
+
 
 def register():
     bpy.utils.register_class(VIEW3D_PT_bone_util)

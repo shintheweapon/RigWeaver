@@ -17,6 +17,7 @@ if "bpy" in locals():
     import importlib
     from . import operators, ui
     importlib.reload(operators.extract_ops)
+    importlib.reload(operators.mesh_gen_ops)
     importlib.reload(operators)
     importlib.reload(ui.panel)
     importlib.reload(ui)
