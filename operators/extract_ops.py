@@ -38,6 +38,11 @@ class BoneUtilProperties(PropertyGroup):
         ),
         default=False,
     )
+    close_mesh_loop: BoolProperty(
+        name="Close Loop",
+        description="Connect last chain back to first (for skirts / rings)",
+        default=False,
+    )
     mesh_ribbon_width: FloatProperty(
         name="Ribbon Width",
         description="Width of the ribbon mesh generated from a single bone chain",
