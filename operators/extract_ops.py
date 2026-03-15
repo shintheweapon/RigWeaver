@@ -34,9 +34,13 @@ def _topo_sort(
         if name in visited:
             return
         visited.add(name)
-        parent_name = parent_name_map.get(name)
-        if parent_name and parent_name in used_names:
-            visit(parent_name)
+        # Walk up past any non-weighted intermediates to the nearest used ancestor
+        current = parent_name_map.get(name)
+        while current is not None:
+            if current in used_names:
+                visit(current)  # ensure ancestor is ordered before this bone
+                break
+            current = parent_name_map.get(current)
         ordered.append(name)
 
     for name in used_names:
