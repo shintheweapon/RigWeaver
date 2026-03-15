@@ -355,7 +355,7 @@ class BONE_OT_generate_mesh(Operator):
         # --- Build and sort chains ---
         chains = _build_chains(selected)
         if not chains:
-            self.report({'ERROR'}, "ArmExt: No chains found in selection.")
+            self.report({'ERROR'}, "RigProxy: No chains found in selection.")
             return {'CANCELLED'}
 
         source_obj = context.object
@@ -378,7 +378,7 @@ class BONE_OT_generate_mesh(Operator):
                     created.append(obj)
 
             if not created:
-                self.report({'ERROR'}, "ArmExt: No geometry could be generated.")
+                self.report({'ERROR'}, "RigProxy: No geometry could be generated.")
                 return {'CANCELLED'}
 
             bpy.ops.pose.select_all(action='DESELECT')
@@ -388,7 +388,7 @@ class BONE_OT_generate_mesh(Operator):
 
             self.report(
                 {'INFO'},
-                f"ArmExt: Created {len(created)} object(s) from {len(chains)} chain(s).",
+                f"RigProxy: Created {len(created)} object(s) from {len(chains)} chain(s).",
             )
             return {'FINISHED'}
 
@@ -426,7 +426,7 @@ class BONE_OT_generate_mesh(Operator):
             )
 
         if not all_faces:
-            self.report({'ERROR'}, "ArmExt: No geometry could be generated.")
+            self.report({'ERROR'}, "RigProxy: No geometry could be generated.")
             return {'CANCELLED'}
 
         if props.mesh_triangulate:
@@ -440,7 +440,7 @@ class BONE_OT_generate_mesh(Operator):
 
         self.report(
             {'INFO'},
-            f"ArmExt: Created '{obj.name}' with {len(all_faces)} face(s) "
+            f"RigProxy: Created '{obj.name}' with {len(all_faces)} face(s) "
             f"from {len(chains)} chain(s).",
         )
         return {'FINISHED'}

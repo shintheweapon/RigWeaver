@@ -7,11 +7,11 @@ from bpy.types import Panel
 
 
 class VIEW3D_PT_bone_util(Panel):
-    bl_label = "Bone Utility"
+    bl_label = "RigProxy"
     bl_idname = "VIEW3D_PT_bone_util"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = "ArmExt"
+    bl_category = "RigProxy"
 
     @classmethod
     def poll(cls, context):
