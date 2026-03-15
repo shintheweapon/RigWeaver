@@ -12,15 +12,65 @@ from __future__ import annotations
 import json
 
 import bpy
-from bpy.types import Operator
+from bpy.props import BoolProperty, StringProperty
+from bpy.types import Operator, PropertyGroup
 from mathutils import Vector
 
-from .analyze_ops import _collect_weighted_names
+
+# ---------------------------------------------------------------------------
+# Properties
+# ---------------------------------------------------------------------------
+
+class BoneUtilProperties(PropertyGroup):
+    retarget_meshes: BoolProperty(
+        name="Retarget Meshes",
+        description=(
+            "Update Armature modifiers on connected meshes to point to "
+            "the new reduced armature instead of the original"
+        ),
+        default=False,
+    )
+    auto_bone_orientation: BoolProperty(
+        name="Auto Bone Orientation",
+        description=(
+            "Recalculate bone rolls on the reduced armature so the local Z axis "
+            "aligns with global +Z (same as FBX import 'Automatic Bone Orientation')"
+        ),
+        default=False,
+    )
+    # JSON-serialised list of weighted bone names, cached between runs
+    last_weighted_bones: StringProperty(default="[]")
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _collect_weighted_names(armature_obj: bpy.types.Object) -> set[str]:
+    """
+    Scan all mesh objects whose Armature modifier targets armature_obj.
+    Return the set of bone names that have at least one vertex weight > 0.
+    """
+    bone_names: set[str] = {b.name for b in armature_obj.data.bones}
+    weighted: set[str] = set()
+
+    for obj in bpy.context.scene.objects:
+        if obj.type != 'MESH':
+            continue
+        for mod in obj.modifiers:
+            if mod.type == 'ARMATURE' and mod.object == armature_obj:
+                weighted_indices = {
+                    g.group
+                    for v in obj.data.vertices
+                    for g in v.groups
+                    if g.weight > 0.0
+                }
+                for vg in obj.vertex_groups:
+                    if vg.index in weighted_indices and vg.name in bone_names:
+                        weighted.add(vg.name)
+                break  # only one Armature modifier needed per mesh
+
+    return weighted
 
 def _topo_sort(
     used_names: set[str],
@@ -270,14 +320,19 @@ class BONE_OT_extract_used_armature(Operator):
 # Registration
 # ---------------------------------------------------------------------------
 
-classes = (BONE_OT_extract_used_armature,)
+classes = (BoneUtilProperties, BONE_OT_extract_used_armature)
 
 
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
+    bpy.types.Scene.bone_util_props = bpy.props.PointerProperty(
+        type=BoneUtilProperties
+    )
 
 
 def unregister():
+    if hasattr(bpy.types.Scene, "bone_util_props"):
+        del bpy.types.Scene.bone_util_props
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)

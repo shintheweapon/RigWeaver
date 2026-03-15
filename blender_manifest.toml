@@ -1,9 +1,9 @@
 schema_version = "1.0.0"
 
-id = "blender_bone_util"
+id = "armature_extractor"
 version = "0.1.0"
-name = "Blender Bone Utility"
-tagline = "Detect unused bones and extract a reduced armature"
+name = "Armature Extractor"
+tagline = "Extract a reduced armature containing only deforming bones"
 maintainer = "theweapon"
 type = "add-on"
 
