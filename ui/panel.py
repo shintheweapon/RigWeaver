@@ -60,9 +60,54 @@ class VIEW3D_PT_bone_util(Panel):
             row.operator("bone_util.generate_mesh", icon='OUTLINER_OB_MESH')
 
 
+class VIEW3D_PT_vg_select(Panel):
+    """RigProxy — Vertex Group Multi-Select (active mesh in Edit Mode)."""
+    bl_label      = "Vertex Group Select"
+    bl_idname     = "VIEW3D_PT_vg_select"
+    bl_space_type  = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category    = "RigProxy"
+
+    @classmethod
+    def poll(cls, context):
+        return (context.object is not None
+                and context.object.type == 'MESH'
+                and context.object.mode == 'EDIT')
+
+    def draw(self, context):
+        layout = self.layout
+        obj = context.object
+
+        if not obj.vertex_groups:
+            layout.label(text="No vertex groups", icon='INFO')
+            return
+
+        # Reconcile: add items for vertex groups not yet tracked.
+        existing = {item.name for item in obj.vg_selection_items}
+        for vg in obj.vertex_groups:
+            if vg.name not in existing:
+                item = obj.vg_selection_items.add()
+                item.name = vg.name
+
+        # All / None bulk buttons.
+        row = layout.row(align=True)
+        row.operator("bone_util.vg_select_all",  text="All")
+        row.operator("bone_util.vg_select_none", text="None")
+
+        # Per-group checkboxes, ordered as Blender lists them.
+        col = layout.column(align=True)
+        item_map = {item.name: item for item in obj.vg_selection_items}
+        for vg in obj.vertex_groups:
+            item = item_map.get(vg.name)
+            if item is not None:
+                col.prop(item, "selected", text=vg.name)
+
+
 def register():
     bpy.utils.register_class(VIEW3D_PT_bone_util)
+    bpy.utils.register_class(VIEW3D_PT_vg_select)
 
 
 def unregister():
+    bpy.utils.unregister_class(VIEW3D_PT_vg_select)
     bpy.utils.unregister_class(VIEW3D_PT_bone_util)
