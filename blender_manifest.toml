@@ -2,8 +2,8 @@ schema_version = "1.0.0"
 
 id = "armature_extractor"
 version = "0.1.0"
-name = "Armature Extractor"
-tagline = "Extract a reduced armature containing only deforming bones"
+name = "RigProxy"
+tagline = "Bone extraction and simulation proxy mesh tools"
 maintainer = "theweapon"
 type = "add-on"
 

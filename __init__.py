@@ -1,15 +1,15 @@
 """
-Armature Extractor
-Extract a reduced armature containing only the bones that deform meshes.
+RigProxy
+Bone extraction and simulation proxy mesh tools.
 """
 
 bl_info = {
-    "name": "Armature Extractor",
+    "name": "RigProxy",
     "author": "theweapon",
     "version": (0, 1, 0),
     "blender": (4, 5, 0),
-    "location": "View3D > Sidebar > ArmExt",
-    "description": "Extract a reduced armature containing only deforming bones",
+    "location": "View3D > Sidebar > RigProxy",
+    "description": "Bone extraction and simulation proxy mesh tools",
     "category": "Rigging",
 }
 
