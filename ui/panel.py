@@ -135,7 +135,8 @@ class VIEW3D_PT_vg_select(Panel):
             text="Preview Mix",
             icon=preview_icon,
         )
-        box.prop(obj, "vg_mix_target_name")
+        box.prop_search(obj, "vg_mix_target_name", obj, "vertex_groups",
+                        text="Target")
         box.prop(obj, "vg_mix_remove_srcs")
         row = box.row()
         row.scale_y = 1.3
