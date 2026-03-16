@@ -72,13 +72,30 @@ class VIEW3D_PT_vg_select(Panel):
     def poll(cls, context):
         return (context.object is not None
                 and context.object.type == 'MESH'
-                and context.object.mode == 'EDIT')
+                and context.object.mode in ('EDIT', 'WEIGHT_PAINT'))
 
     def draw(self, context):
         import json
         layout = self.layout
         obj = context.object
 
+        # ── Weight Paint mode: preview is active ───────────────────────────
+        if obj.mode == 'WEIGHT_PAINT':
+            layout.label(text="Previewing mixed weights", icon='HIDE_OFF')
+            layout.operator(
+                "bone_util.vg_preview_mix",
+                text="Exit Preview",
+                icon='LOOP_BACK',
+            )
+            layout.separator()
+            layout.operator(
+                "bone_util.vg_mix_groups",
+                text="Mix into Group",
+                icon='AUTOMERGE_ON',
+            )
+            return
+
+        # ── Edit Mode ──────────────────────────────────────────────────────
         if not obj.vertex_groups:
             layout.label(text="No vertex groups", icon='INFO')
             return
@@ -100,6 +117,24 @@ class VIEW3D_PT_vg_select(Panel):
                 text=vg.name,
                 icon=icon,
             ).group_name = vg.name
+
+        # ── Mix Checked Groups ─────────────────────────────────────────────
+        layout.separator()
+        box = layout.box()
+        box.label(text="Mix Checked Groups", icon='AUTOMERGE_ON')
+        box.prop(obj, "vg_mix_blend_mode")
+        preview_icon = 'HIDE_OFF' if obj.vg_mix_preview_active else 'HIDE_ON'
+        box.operator(
+            "bone_util.vg_preview_mix",
+            text="Preview Mix",
+            icon=preview_icon,
+        )
+        box.prop(obj, "vg_mix_target_name")
+        box.prop(obj, "vg_mix_remove_srcs")
+        row = box.row()
+        row.scale_y = 1.3
+        row.operator("bone_util.vg_mix_groups", text="Mix into Group",
+                     icon='AUTOMERGE_ON')
 
 
 def register():
