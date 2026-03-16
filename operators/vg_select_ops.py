@@ -328,6 +328,11 @@ def register():
         description="Whether the mix preview is currently displayed",
         default=False,
     )
+    bpy.types.Object.vg_filter_text = StringProperty(
+        name="Filter",
+        description="Show only vertex groups whose name contains this text",
+        default="",
+    )
 
 
 def unregister():
@@ -337,6 +342,7 @@ def unregister():
         "vg_mix_target_name",
         "vg_mix_remove_srcs",
         "vg_mix_preview_active",
+        "vg_filter_text",
     ):
         if hasattr(bpy.types.Object, attr):
             delattr(bpy.types.Object, attr)

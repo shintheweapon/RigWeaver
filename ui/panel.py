@@ -108,9 +108,15 @@ class VIEW3D_PT_vg_select(Panel):
         row.operator("bone_util.vg_select_all",  text="All")
         row.operator("bone_util.vg_select_none", text="None")
 
+        # Search / filter field.
+        layout.prop(obj, "vg_filter_text", text="", icon='VIEWZOOM')
+        filter_text = obj.vg_filter_text.lower()
+
         # Per-group toggle buttons with checkbox icons.
         col = layout.column(align=True)
         for vg in obj.vertex_groups:
+            if filter_text and filter_text not in vg.name.lower():
+                continue
             icon = 'CHECKBOX_HLT' if vg.name in selected else 'CHECKBOX_DEHLT'
             col.operator(
                 "bone_util.vg_toggle",
