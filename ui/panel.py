@@ -60,9 +60,53 @@ class VIEW3D_PT_bone_util(Panel):
             row.operator("bone_util.generate_mesh", icon='OUTLINER_OB_MESH')
 
 
+class VIEW3D_PT_vg_select(Panel):
+    """RigProxy — Vertex Group Multi-Select (active mesh in Edit Mode)."""
+    bl_label      = "Vertex Group Select"
+    bl_idname     = "VIEW3D_PT_vg_select"
+    bl_space_type  = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category    = "RigProxy"
+
+    @classmethod
+    def poll(cls, context):
+        return (context.object is not None
+                and context.object.type == 'MESH'
+                and context.object.mode == 'EDIT')
+
+    def draw(self, context):
+        import json
+        layout = self.layout
+        obj = context.object
+
+        if not obj.vertex_groups:
+            layout.label(text="No vertex groups", icon='INFO')
+            return
+
+        # Read-only: no data mutations here.
+        selected: set[str] = set(json.loads(obj.vg_selected_groups))
+
+        # All / None bulk buttons.
+        row = layout.row(align=True)
+        row.operator("bone_util.vg_select_all",  text="All")
+        row.operator("bone_util.vg_select_none", text="None")
+
+        # Per-group toggle buttons with checkbox icons.
+        col = layout.column(align=True)
+        for vg in obj.vertex_groups:
+            icon = 'CHECKBOX_HLT' if vg.name in selected else 'CHECKBOX_DEHLT'
+            col.operator(
+                "bone_util.vg_toggle",
+                text=vg.name,
+                icon=icon,
+            ).group_name = vg.name
+
+
 def register():
     bpy.utils.register_class(VIEW3D_PT_bone_util)
+    bpy.utils.register_class(VIEW3D_PT_vg_select)
 
 
 def unregister():
+    bpy.utils.unregister_class(VIEW3D_PT_vg_select)
     bpy.utils.unregister_class(VIEW3D_PT_bone_util)
