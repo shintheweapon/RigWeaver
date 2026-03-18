@@ -86,6 +86,31 @@ def _sort_chains(chains: list[list], parent_bone) -> list[list]:
     return ordered
 
 
+def _split_into_strips(chains: list[list], gap_factor: float) -> list[list[list]]:
+    """
+    Split a sorted chain list into strips wherever the gap between consecutive
+    chain roots exceeds gap_factor * median inter-chain distance.
+    Returns a list of strips (each strip is a list of chains).
+    """
+    if len(chains) <= 1:
+        return [chains]
+
+    roots = [Vector(c[0].tail) for c in chains]
+    dists = [(roots[i + 1] - roots[i]).length for i in range(len(chains) - 1)]
+    median_dist = sorted(dists)[len(dists) // 2]
+    threshold = gap_factor * median_dist
+
+    strips, current = [], [chains[0]]
+    for i, d in enumerate(dists):
+        if d > threshold:
+            strips.append(current)
+            current = [chains[i + 1]]
+        else:
+            current.append(chains[i + 1])
+    strips.append(current)
+    return strips
+
+
 def _chain_levels(chain: list) -> list[Vector]:
     """
     Return N+2 world-space positions for the cross-section mesh rows (N bones).
@@ -409,9 +434,6 @@ class BONE_OT_generate_mesh(Operator):
                 _ribbon_from_chain(chain, props.mesh_ribbon_width, all_verts, all_faces)
         else:
             # Connected mode → cross-section surface between adjacent chains.
-            # Use the shared parent bone as the sort axis when all chains
-            # have the same immediate parent (skirt / hair); fall back to
-            # centroid-based sorting otherwise.
             first_parent = chains[0][0].parent
             common_parent = (
                 first_parent
@@ -419,13 +441,26 @@ class BONE_OT_generate_mesh(Operator):
                 else None
             )
             sorted_chains = _sort_chains(chains, common_parent)
-            _cross_section_mesh(
-                sorted_chains,
-                props.close_mesh_loop,
-                props.mesh_panel_resolution,
-                all_verts,
-                all_faces,
+
+            strips = (
+                _split_into_strips(sorted_chains, props.mesh_strip_gap_factor)
+                if props.mesh_auto_split_strips
+                else [sorted_chains]
             )
+            # close_mesh_loop is suppressed per-strip when auto-split is on
+            loop = props.close_mesh_loop and not props.mesh_auto_split_strips
+            for strip in strips:
+                if len(strip) == 1:
+                    _ribbon_from_chain(strip[0], props.mesh_ribbon_width,
+                                       all_verts, all_faces)
+                else:
+                    _cross_section_mesh(
+                        strip,
+                        loop,
+                        props.mesh_panel_resolution,
+                        all_verts,
+                        all_faces,
+                    )
 
         if not all_faces:
             self.report({'ERROR'}, "RigProxy: No geometry could be generated.")

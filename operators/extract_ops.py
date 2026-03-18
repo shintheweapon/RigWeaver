@@ -82,6 +82,25 @@ class BoneUtilProperties(PropertyGroup):
         soft_max=1.0,
         unit='LENGTH',
     )
+    mesh_auto_split_strips: BoolProperty(
+        name="Auto Split Strips",
+        description=(
+            "Automatically split chains into separate strips when a large gap "
+            "between adjacent chains is detected. Use for skirts with inner and "
+            "outer loops that should not be bridged."
+        ),
+        default=False,
+    )
+    mesh_strip_gap_factor: FloatProperty(
+        name="Gap Factor",
+        description=(
+            "A gap larger than this multiple of the median inter-chain distance "
+            "is treated as a strip boundary"
+        ),
+        default=2.0,
+        min=1.1,
+        soft_max=10.0,
+    )
     # JSON-serialised list of weighted bone names, cached between runs
     last_weighted_bones: StringProperty(default="[]")
 

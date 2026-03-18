@@ -74,6 +74,10 @@ class VIEW3D_PT_bone_util(Panel):
             if props.mesh_individual_chains:
                 box.prop(props, "mesh_split_objects")
             box.prop(props, "close_mesh_loop")
+            if not props.mesh_individual_chains:
+                box.prop(props, "mesh_auto_split_strips")
+                if props.mesh_auto_split_strips:
+                    box.prop(props, "mesh_strip_gap_factor")
             box.prop(props, "mesh_panel_resolution")
             box.prop(props, "mesh_ribbon_width")
             box.prop(props, "mesh_triangulate")
