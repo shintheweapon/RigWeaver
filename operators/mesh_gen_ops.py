@@ -125,10 +125,15 @@ def _assign_bone_vertex_groups(
     mesh_obj: "bpy.types.Object",
     verts: list[Vector],
     chains: list[list],
+    envelope_factor: float = 1.5,
 ) -> None:
     """
-    Create one vertex group per bone (named bone.name) and assign
-    inverse-distance² weights, normalised to sum ≤ 1.0 per vertex.
+    Create one vertex group per bone and assign envelope-style weights.
+
+    Each bone's radius = bone_length × envelope_factor.
+    Falloff: w = (1 - (d/r)²)², reaching exactly zero at the envelope boundary.
+    Vertices outside all envelopes fall back to the nearest bone (weight 1.0).
+    Weights are normalised to sum to 1.0 per vertex.
     """
     all_bones = [bone for chain in chains for bone in chain]
 
@@ -139,20 +144,23 @@ def _assign_bone_vertex_groups(
         vgs.append(vg)
 
     for vi, pos in enumerate(verts):
-        dists = [
-            _distance_to_segment(pos, Vector(b.head), Vector(b.tail))
-            for b in all_bones
-        ]
+        weights = []
+        for bone in all_bones:
+            d = _distance_to_segment(pos, Vector(bone.head), Vector(bone.tail))
+            bone_len = (Vector(bone.tail) - Vector(bone.head)).length
+            r = max(bone_len * envelope_factor, 1e-6)
+            t = d / r
+            weights.append(0.0 if t >= 1.0 else (1.0 - t * t) ** 2)
 
-        min_d = min(dists)
-        if min_d < 1e-6:
-            for vg, d in zip(vgs, dists):
-                if d < 1e-6:
-                    vg.add([vi], 1.0, 'REPLACE')
+        total = sum(weights)
+        if total < 1e-6:
+            # Vertex outside all envelopes → assign fully to nearest bone
+            nearest = min(range(len(all_bones)),
+                          key=lambda i: _distance_to_segment(
+                              pos, Vector(all_bones[i].head), Vector(all_bones[i].tail)))
+            vgs[nearest].add([vi], 1.0, 'REPLACE')
         else:
-            inv_sq = [1.0 / (d * d) for d in dists]
-            total = sum(inv_sq)
-            for vg, w in zip(vgs, inv_sq):
+            for vg, w in zip(vgs, weights):
                 weight = w / total
                 if weight > 0.001:
                     vg.add([vi], weight, 'REPLACE')
@@ -613,7 +621,7 @@ class BONE_OT_generate_mesh(Operator):
                 faces = _triangulate_faces(faces)
             obj = _create_mesh_object("BoneMesh", verts, faces, source_obj, context)
             if props.mesh_auto_rig:
-                _assign_bone_vertex_groups(obj, verts, chains)
+                _assign_bone_vertex_groups(obj, verts, chains, props.mesh_envelope_factor)
                 obj.modifiers.new(name="Armature", type='ARMATURE').object = source_obj
             bpy.ops.pose.select_all(action='DESELECT')
             context.view_layer.objects.active = obj
@@ -638,7 +646,7 @@ class BONE_OT_generate_mesh(Operator):
                         f"BoneMesh_{chain[0].name}", verts, faces, source_obj, context
                     )
                     if props.mesh_auto_rig:
-                        _assign_bone_vertex_groups(obj, verts, [chain])
+                        _assign_bone_vertex_groups(obj, verts, [chain], props.mesh_envelope_factor)
                         obj.modifiers.new(name="Armature", type='ARMATURE').object = source_obj
                     created.append(obj)
             if not created:
@@ -710,7 +718,7 @@ class BONE_OT_generate_mesh(Operator):
 
         obj = _create_mesh_object("BoneMesh", all_verts, all_faces, source_obj, context)
         if props.mesh_auto_rig:
-            _assign_bone_vertex_groups(obj, all_verts, chains_used)
+            _assign_bone_vertex_groups(obj, all_verts, chains_used, props.mesh_envelope_factor)
             obj.modifiers.new(name="Armature", type='ARMATURE').object = source_obj
 
         bpy.ops.pose.select_all(action='DESELECT')

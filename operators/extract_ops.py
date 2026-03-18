@@ -115,6 +115,16 @@ class BoneUtilProperties(PropertyGroup):
         min=0.1,
         soft_max=10.0,
     )
+    mesh_envelope_factor: FloatProperty(
+        name="Envelope Size",
+        description=(
+            "Radius of each bone's weight envelope as a multiple of the bone's length. "
+            "Vertices outside all envelopes fall back to the nearest bone."
+        ),
+        default=1.5,
+        min=0.1,
+        soft_max=5.0,
+    )
     mesh_auto_rig: BoolProperty(
         name="Auto-Rig",
         description=(

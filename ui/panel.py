@@ -84,6 +84,8 @@ class VIEW3D_PT_bone_util(Panel):
             box.prop(props, "mesh_ribbon_width")
             box.prop(props, "mesh_triangulate")
             box.prop(props, "mesh_auto_rig")
+            if props.mesh_auto_rig:
+                box.prop(props, "mesh_envelope_factor")
             row = box.row()
             row.scale_y = 1.3
             row.operator("bone_util.generate_mesh", icon='OUTLINER_OB_MESH')
