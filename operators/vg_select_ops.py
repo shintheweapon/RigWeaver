@@ -333,11 +333,6 @@ def register():
         description="Active index for vertex group UIList",
         default=0,
     )
-    bpy.types.Object.vg_filter_text = StringProperty(
-        name="Filter",
-        description="Show only vertex groups whose name contains this text",
-        default="",
-    )
 
 
 def unregister():
@@ -348,7 +343,6 @@ def unregister():
         "vg_mix_remove_srcs",
         "vg_mix_preview_active",
         "vg_active_index",
-        "vg_filter_text",
     ):
         if hasattr(bpy.types.Object, attr):
             delattr(bpy.types.Object, attr)

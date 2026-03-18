@@ -11,7 +11,10 @@ from bpy.types import Panel
 class BONE_UL_vg_list(bpy.types.UIList):
     """Scrollable vertex-group list with checkbox toggle buttons."""
     bl_idname = "BONE_UL_vg_list"
-    use_filter_show = False  # filter is handled via our own vg_filter_text field
+    use_filter_show = True
+
+    def draw_filter(self, context, layout):
+        layout.prop(self, "filter_name", text="", icon='VIEWZOOM')
 
     def draw_item(self, context, layout, data, item, icon,
                   active_data, active_propname, index=0):
@@ -23,17 +26,6 @@ class BONE_UL_vg_list(bpy.types.UIList):
             "bone_util.vg_toggle",
             text=vg.name, icon=chk, emboss=False,
         ).group_name = vg.name
-
-    def filter_items(self, context, data, propname):
-        vgs = getattr(data, propname)
-        filter_text = data.vg_filter_text.lower()
-        flags = []
-        for vg in vgs:
-            if filter_text and filter_text not in vg.name.lower():
-                flags.append(0)
-            else:
-                flags.append(self.bitflag_filter_item)
-        return flags, []
 
 
 class VIEW3D_PT_bone_util(Panel):
@@ -134,10 +126,7 @@ class VIEW3D_PT_vg_select(Panel):
         row.operator("bone_util.vg_select_all",  text="All")
         row.operator("bone_util.vg_select_none", text="None")
 
-        # Always-visible filter field — filters the list in real time.
-        layout.prop(obj, "vg_filter_text", text="", icon='VIEWZOOM')
-
-        # Scrollable group list.
+        # Scrollable group list (filter rendered inside list header by draw_filter).
         layout.template_list(
             "BONE_UL_vg_list", "",
             obj, "vertex_groups",
