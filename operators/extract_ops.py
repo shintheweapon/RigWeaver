@@ -101,6 +101,22 @@ class BoneUtilProperties(PropertyGroup):
         min=1.1,
         soft_max=10.0,
     )
+    mesh_assign_vertex_groups: BoolProperty(
+        name="Assign Vertex Groups",
+        description=(
+            "Create one vertex group per bone with inverse-distance weights. "
+            "Group names match bone names so an Armature modifier works immediately."
+        ),
+        default=False,
+    )
+    mesh_add_armature_modifier: BoolProperty(
+        name="Add Armature Modifier",
+        description=(
+            "Add an Armature modifier to the generated mesh pointing to the "
+            "source armature (only active when Assign Vertex Groups is on)"
+        ),
+        default=False,
+    )
     # JSON-serialised list of weighted bone names, cached between runs
     last_weighted_bones: StringProperty(default="[]")
 

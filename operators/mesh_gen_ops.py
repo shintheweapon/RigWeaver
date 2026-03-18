@@ -111,6 +111,53 @@ def _split_into_strips(chains: list[list], gap_factor: float) -> list[list[list]
     return strips
 
 
+def _distance_to_segment(pos: Vector, head: Vector, tail: Vector) -> float:
+    """Shortest distance from pos to the line segment head→tail."""
+    seg = tail - head
+    seg_len_sq = seg.length_squared
+    if seg_len_sq < 1e-10:
+        return (pos - head).length
+    fac = max(0.0, min(1.0, (pos - head).dot(seg) / seg_len_sq))
+    return (pos - (head + seg * fac)).length
+
+
+def _assign_bone_vertex_groups(
+    mesh_obj: "bpy.types.Object",
+    verts: list[Vector],
+    chains: list[list],
+) -> None:
+    """
+    Create one vertex group per bone (named bone.name) and assign
+    inverse-distance² weights, normalised to sum ≤ 1.0 per vertex.
+    """
+    all_bones = [bone for chain in chains for bone in chain]
+
+    vgs = []
+    for bone in all_bones:
+        vg = (mesh_obj.vertex_groups.get(bone.name)
+              or mesh_obj.vertex_groups.new(name=bone.name))
+        vgs.append(vg)
+
+    for vi, pos in enumerate(verts):
+        dists = [
+            _distance_to_segment(pos, Vector(b.head), Vector(b.tail))
+            for b in all_bones
+        ]
+
+        min_d = min(dists)
+        if min_d < 1e-6:
+            for vg, d in zip(vgs, dists):
+                if d < 1e-6:
+                    vg.add([vi], 1.0, 'REPLACE')
+        else:
+            inv_sq = [1.0 / (d * d) for d in dists]
+            total = sum(inv_sq)
+            for vg, w in zip(vgs, inv_sq):
+                weight = w / total
+                if weight > 0.001:
+                    vg.add([vi], weight, 'REPLACE')
+
+
 def _chain_levels(chain: list) -> list[Vector]:
     """
     Return N+2 world-space positions for the cross-section mesh rows (N bones).
@@ -402,6 +449,11 @@ class BONE_OT_generate_mesh(Operator):
                     obj = _create_mesh_object(
                         f"BoneMesh_{chain[0].name}", verts, faces, source_obj, context
                     )
+                    if props.mesh_assign_vertex_groups:
+                        _assign_bone_vertex_groups(obj, verts, [chain])
+                        if props.mesh_add_armature_modifier:
+                            mod = obj.modifiers.new(name="Armature", type='ARMATURE')
+                            mod.object = source_obj
                     created.append(obj)
 
             if not created:
@@ -424,14 +476,17 @@ class BONE_OT_generate_mesh(Operator):
         # ------------------------------------------------------------------
         all_verts: list[Vector] = []
         all_faces: list[tuple[int, ...]] = []
+        chains_used: list[list] = []
 
         if len(chains) == 1:
             # Single chain → ribbon using bone local X axis for width
             _ribbon_from_chain(chains[0], props.mesh_ribbon_width, all_verts, all_faces)
+            chains_used.extend(chains)
         elif props.mesh_individual_chains:
             # Individual mode, merged → one ribbon per chain combined
             for chain in chains:
                 _ribbon_from_chain(chain, props.mesh_ribbon_width, all_verts, all_faces)
+            chains_used.extend(chains)
         else:
             # Connected mode → cross-section surface between adjacent chains.
             first_parent = chains[0][0].parent
@@ -461,6 +516,7 @@ class BONE_OT_generate_mesh(Operator):
                         all_verts,
                         all_faces,
                     )
+                chains_used.extend(strip)
 
         if not all_faces:
             self.report({'ERROR'}, "RigProxy: No geometry could be generated.")
@@ -470,6 +526,12 @@ class BONE_OT_generate_mesh(Operator):
             all_faces = _triangulate_faces(all_faces)
 
         obj = _create_mesh_object("BoneMesh", all_verts, all_faces, source_obj, context)
+
+        if props.mesh_assign_vertex_groups:
+            _assign_bone_vertex_groups(obj, all_verts, chains_used)
+            if props.mesh_add_armature_modifier:
+                mod = obj.modifiers.new(name="Armature", type='ARMATURE')
+                mod.object = source_obj
 
         bpy.ops.pose.select_all(action='DESELECT')
         context.view_layer.objects.active = obj
