@@ -65,12 +65,22 @@ class BoneUtilProperties(PropertyGroup):
         default=False,
     )
     mesh_panel_resolution: IntProperty(
-        name="Panel Resolution",
+        name="Column Resolution",
         description=(
-            "Number of quad columns per panel between adjacent chains. "
-            "1 = one column, 2+ = interpolated columns for denser simulation mesh"
+            "Quad columns per panel in the lateral direction (between adjacent chains). "
+            "1 = single column."
         ),
         default=2,
+        min=1,
+        max=16,
+    )
+    mesh_bone_subdivisions: IntProperty(
+        name="Row Resolution",
+        description=(
+            "Subdivisions per bone segment in the longitudinal direction (along the chain). "
+            "1 = one row per bone, 2+ = interpolated rows within each segment."
+        ),
+        default=1,
         min=1,
         max=16,
     )
@@ -81,6 +91,34 @@ class BoneUtilProperties(PropertyGroup):
         min=0.001,
         soft_max=1.0,
         unit='LENGTH',
+    )
+    mesh_auto_split_strips: BoolProperty(
+        name="Auto Split Strips",
+        description=(
+            "Automatically split chains into separate strips when a large gap "
+            "between adjacent chains is detected. Use for skirts with inner and "
+            "outer loops that should not be bridged."
+        ),
+        default=False,
+    )
+    mesh_strip_gap_factor: FloatProperty(
+        name="Gap Factor",
+        description=(
+            "A gap larger than this multiple of the median inter-chain distance "
+            "is treated as a strip boundary"
+        ),
+        default=2.0,
+        min=1.1,
+        soft_max=10.0,
+    )
+    mesh_auto_rig: BoolProperty(
+        name="Auto-Rig",
+        description=(
+            "Create one vertex group per bone (inverse-distance weights) and add "
+            "an Armature modifier pointing to the source armature, making the "
+            "generated mesh immediately deform-ready."
+        ),
+        default=False,
     )
     # JSON-serialised list of weighted bone names, cached between runs
     last_weighted_bones: StringProperty(default="[]")
