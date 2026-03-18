@@ -2,8 +2,38 @@
 N-panel for the Blender Bone Utility addon.
 Visible in the 3D Viewport sidebar when the active object is an armature.
 """
+import json
+
 import bpy
 from bpy.types import Panel
+
+
+class BONE_UL_vg_list(bpy.types.UIList):
+    """Scrollable vertex-group list with checkbox toggle buttons."""
+    bl_idname = "BONE_UL_vg_list"
+    use_filter_show = False  # filter is handled via our own vg_filter_text field
+
+    def draw_item(self, context, layout, data, item, icon,
+                  active_data, active_propname, index=0):
+        obj = data
+        vg = item
+        selected = set(json.loads(obj.vg_selected_groups))
+        chk = 'CHECKBOX_HLT' if vg.name in selected else 'CHECKBOX_DEHLT'
+        layout.operator(
+            "bone_util.vg_toggle",
+            text=vg.name, icon=chk, emboss=False,
+        ).group_name = vg.name
+
+    def filter_items(self, context, data, propname):
+        vgs = getattr(data, propname)
+        filter_text = data.vg_filter_text.lower()
+        flags = []
+        for vg in vgs:
+            if filter_text and filter_text not in vg.name.lower():
+                flags.append(0)
+            else:
+                flags.append(self.bitflag_filter_item)
+        return flags, []
 
 
 class VIEW3D_PT_bone_util(Panel):
@@ -75,7 +105,6 @@ class VIEW3D_PT_vg_select(Panel):
                 and context.object.mode in ('EDIT', 'WEIGHT_PAINT'))
 
     def draw(self, context):
-        import json
         layout = self.layout
         obj = context.object
 
@@ -100,29 +129,21 @@ class VIEW3D_PT_vg_select(Panel):
             layout.label(text="No vertex groups", icon='INFO')
             return
 
-        # Read-only: no data mutations here.
-        selected: set[str] = set(json.loads(obj.vg_selected_groups))
-
         # All / None bulk buttons.
         row = layout.row(align=True)
         row.operator("bone_util.vg_select_all",  text="All")
         row.operator("bone_util.vg_select_none", text="None")
 
-        # Search / filter field.
+        # Always-visible filter field — filters the list in real time.
         layout.prop(obj, "vg_filter_text", text="", icon='VIEWZOOM')
-        filter_text = obj.vg_filter_text.lower()
 
-        # Per-group toggle buttons with checkbox icons.
-        col = layout.column(align=True)
-        for vg in obj.vertex_groups:
-            if filter_text and filter_text not in vg.name.lower():
-                continue
-            icon = 'CHECKBOX_HLT' if vg.name in selected else 'CHECKBOX_DEHLT'
-            col.operator(
-                "bone_util.vg_toggle",
-                text=vg.name,
-                icon=icon,
-            ).group_name = vg.name
+        # Scrollable group list.
+        layout.template_list(
+            "BONE_UL_vg_list", "",
+            obj, "vertex_groups",
+            obj, "vg_active_index",
+            rows=6, maxrows=12,
+        )
 
         # ── Mix Checked Groups ─────────────────────────────────────────────
         layout.separator()
@@ -145,6 +166,7 @@ class VIEW3D_PT_vg_select(Panel):
 
 
 def register():
+    bpy.utils.register_class(BONE_UL_vg_list)
     bpy.utils.register_class(VIEW3D_PT_bone_util)
     bpy.utils.register_class(VIEW3D_PT_vg_select)
 
@@ -152,3 +174,4 @@ def register():
 def unregister():
     bpy.utils.unregister_class(VIEW3D_PT_vg_select)
     bpy.utils.unregister_class(VIEW3D_PT_bone_util)
+    bpy.utils.unregister_class(BONE_UL_vg_list)

@@ -11,7 +11,7 @@ import json
 
 import bpy
 import bmesh
-from bpy.props import BoolProperty, EnumProperty, StringProperty
+from bpy.props import BoolProperty, EnumProperty, IntProperty, StringProperty
 from bpy.types import Operator
 
 # Name of the temporary vertex group used for mix preview.
@@ -328,6 +328,11 @@ def register():
         description="Whether the mix preview is currently displayed",
         default=False,
     )
+    bpy.types.Object.vg_active_index = IntProperty(
+        name="VG Active Index",
+        description="Active index for vertex group UIList",
+        default=0,
+    )
     bpy.types.Object.vg_filter_text = StringProperty(
         name="Filter",
         description="Show only vertex groups whose name contains this text",
@@ -342,6 +347,7 @@ def unregister():
         "vg_mix_target_name",
         "vg_mix_remove_srcs",
         "vg_mix_preview_active",
+        "vg_active_index",
         "vg_filter_text",
     ):
         if hasattr(bpy.types.Object, attr):
