@@ -274,8 +274,10 @@ def _cross_section_mesh(
                          if i == N - 1
                          else _mid_col(all_levels[i],   all_levels[i + 1], depth))
 
-        interpolated = _interpolate_levels(left_col, right_col, resolution)
-        all_columns  = [left_col] + interpolated + [right_col]
+        center_col   = all_levels[i][:depth]  # actual bone positions — always a vertex
+        left_interp  = _interpolate_levels(left_col,   center_col, resolution)
+        right_interp = _interpolate_levels(center_col, right_col,  resolution)
+        all_columns  = [left_col] + left_interp + [center_col] + right_interp + [right_col]
         _fill_columns(all_columns, len(chains[i]), len(chains[i]), vert_list, face_list)
 
 
