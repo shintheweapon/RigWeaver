@@ -49,6 +49,8 @@ class BoneUtilProperties(PropertyGroup):
              "Closed surface, last chain connects back to first (skirts, rings, cylinders)"),
             ('SURFACE_SPLIT', "Auto-Split Surface",
              "Connected surface with automatic gap detection (inner/outer loop layouts, box pleats)"),
+        ('TREE',          "Tree Surface",
+             "Sample-point triangulation for branching or irregular layouts (capes, fans)"),
         ],
         default='SURFACE',
     )
@@ -101,6 +103,16 @@ class BoneUtilProperties(PropertyGroup):
         ),
         default=2.0,
         min=1.1,
+        soft_max=10.0,
+    )
+    mesh_tree_alpha_factor: FloatProperty(
+        name="Bridge Filter",
+        description=(
+            "Circumradius threshold as a multiple of the median edge length. "
+            "Higher values keep more triangles; lower values prune long bridging edges."
+        ),
+        default=2.0,
+        min=0.1,
         soft_max=10.0,
     )
     mesh_auto_rig: BoolProperty(

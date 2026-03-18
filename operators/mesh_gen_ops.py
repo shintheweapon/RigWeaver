@@ -372,6 +372,153 @@ def _cross_section_mesh(
 
 
 # ---------------------------------------------------------------------------
+# Tree Surface helpers (Bowyer-Watson Delaunay + alpha-shape filter)
+# ---------------------------------------------------------------------------
+
+def _bowyer_watson(pts2d: list[tuple[float, float]]) -> list[tuple[int, int, int]]:
+    """
+    Incremental Bowyer-Watson Delaunay triangulation.
+    Returns a list of (i, j, k) index triples into pts2d.
+    """
+    import math
+
+    def _circumcircle(ax, ay, bx, by, cx, cy):
+        D = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
+        if abs(D) < 1e-10:
+            return None
+        ux = ((ax*ax + ay*ay)*(by - cy) + (bx*bx + by*by)*(cy - ay) + (cx*cx + cy*cy)*(ay - by)) / D
+        uy = ((ax*ax + ay*ay)*(cx - bx) + (bx*bx + by*by)*(ax - cx) + (cx*cx + cy*cy)*(bx - ax)) / D
+        r2 = (ax - ux)**2 + (ay - uy)**2
+        return ux, uy, r2
+
+    n = len(pts2d)
+    if n < 3:
+        return []
+
+    xs = [p[0] for p in pts2d]
+    ys = [p[1] for p in pts2d]
+    min_x, max_x = min(xs), max(xs)
+    min_y, max_y = min(ys), max(ys)
+    dx = (max_x - min_x) or 1.0
+    dy = (max_y - min_y) or 1.0
+    delta = max(dx, dy) * 10.0
+    mid_x = (min_x + max_x) / 2.0
+    # Super-triangle vertex indices: n, n+1, n+2
+    pts = list(pts2d) + [
+        (mid_x - 20.0 * delta, min_y - delta),
+        (mid_x,                max_y + 20.0 * delta),
+        (mid_x + 20.0 * delta, min_y - delta),
+    ]
+    super_idx = {n, n + 1, n + 2}
+
+    cc = _circumcircle(*pts[n], *pts[n + 1], *pts[n + 2])
+    triangles: list[list] = [[n, n + 1, n + 2, cc[0], cc[1], cc[2]]] if cc else []
+
+    for pi in range(n):
+        px, py = pts[pi]
+        bad = [t for t in triangles
+               if t[5] is not None and (px - t[3])**2 + (py - t[4])**2 < t[5]]
+
+        edge_count: dict[tuple[int, int], int] = {}
+        for t in bad:
+            for edge in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])):
+                key = (min(edge), max(edge))
+                edge_count[key] = edge_count.get(key, 0) + 1
+        boundary = [e for e, cnt in edge_count.items() if cnt == 1]
+
+        for t in bad:
+            triangles.remove(t)
+
+        for (ei, ej) in boundary:
+            c = _circumcircle(*pts[ei], *pts[ej], px, py)
+            if c is None:
+                continue
+            triangles.append([ei, ej, pi, c[0], c[1], c[2]])
+
+    return [(t[0], t[1], t[2]) for t in triangles
+            if not (super_idx & {t[0], t[1], t[2]})]
+
+
+def _alpha_filter(
+    pts2d: list[tuple[float, float]],
+    triangles: list[tuple[int, int, int]],
+    alpha: float,
+) -> list[tuple[int, int, int]]:
+    """Remove triangles whose circumradius exceeds alpha."""
+    import math
+
+    def _circumradius(ax, ay, bx, by, cx, cy) -> float:
+        a = math.hypot(bx - cx, by - cy)
+        b = math.hypot(ax - cx, ay - cy)
+        c = math.hypot(ax - bx, ay - by)
+        area2 = abs((bx - ax) * (cy - ay) - (cx - ax) * (by - ay))
+        if area2 < 1e-10:
+            return float('inf')
+        return (a * b * c) / (2.0 * area2)
+
+    return [(i, j, k) for (i, j, k) in triangles
+            if _circumradius(*pts2d[i], *pts2d[j], *pts2d[k]) <= alpha]
+
+
+def _tree_surface_mesh(
+    chains: list[list],
+    subdivisions: int,
+    alpha_factor: float,
+    vert_list: list[Vector],
+    face_list: list[tuple[int, ...]],
+) -> None:
+    """
+    Sample-point Delaunay triangulation for irregular/branching chain layouts.
+
+    1. Collect 3D level positions from all chains via _chain_levels.
+    2. Project to 2D via PCA (NumPy SVD on centred points).
+    3. Bowyer-Watson Delaunay on the 2D projection.
+    4. Alpha-shape filter: remove triangles with circumradius >
+       alpha_factor × median edge length.
+    5. Emit to vert_list / face_list.
+    """
+    import numpy as np
+    import math
+
+    pts3d: list[Vector] = []
+    for chain in chains:
+        pts3d.extend(_chain_levels(chain, subdivisions))
+
+    if len(pts3d) < 3:
+        return
+
+    arr = np.array([(v.x, v.y, v.z) for v in pts3d], dtype=float)
+    centroid = arr.mean(axis=0)
+    centered = arr - centroid
+    _, _, Vt = np.linalg.svd(centered, full_matrices=False)
+    pts2d = [(float(row[0]), float(row[1])) for row in centered @ Vt[:2].T]
+
+    tris = _bowyer_watson(pts2d)
+    if not tris:
+        return
+
+    edge_lengths = []
+    for (i, j, k) in tris:
+        for (a, b) in ((i, j), (j, k), (k, i)):
+            dx = pts2d[a][0] - pts2d[b][0]
+            dy = pts2d[a][1] - pts2d[b][1]
+            edge_lengths.append(math.hypot(dx, dy))
+    if not edge_lengths:
+        return
+    median_edge = sorted(edge_lengths)[len(edge_lengths) // 2]
+    alpha = alpha_factor * median_edge
+
+    tris = _alpha_filter(pts2d, tris, alpha)
+    if not tris:
+        return
+
+    base = len(vert_list)
+    vert_list.extend(pts3d)
+    for (i, j, k) in tris:
+        face_list.append((base + i, base + j, base + k))
+
+
+# ---------------------------------------------------------------------------
 # Triangulation helper
 # ---------------------------------------------------------------------------
 
@@ -518,7 +665,7 @@ class BONE_OT_generate_mesh(Operator):
                                    props.mesh_bone_subdivisions, all_verts, all_faces)
             chains_used.extend(chains)
 
-        else:  # SURFACE, SURFACE_LOOP, SURFACE_SPLIT
+        elif mode in ('SURFACE', 'SURFACE_LOOP', 'SURFACE_SPLIT'):
             first_parent = chains[0][0].parent
             common_parent = (
                 first_parent
@@ -543,6 +690,16 @@ class BONE_OT_generate_mesh(Operator):
                         subdivisions=props.mesh_bone_subdivisions,
                     )
                 chains_used.extend(strip)
+
+        elif mode == 'TREE':
+            _tree_surface_mesh(
+                chains,
+                props.mesh_bone_subdivisions,
+                props.mesh_tree_alpha_factor,
+                all_verts,
+                all_faces,
+            )
+            chains_used.extend(chains)
 
         if not all_faces:
             self.report({'ERROR'}, "RigProxy: No geometry could be generated.")

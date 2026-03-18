@@ -76,7 +76,9 @@ class VIEW3D_PT_bone_util(Panel):
                 box.prop(props, "mesh_split_objects")
             elif mesh_mode == 'SURFACE_SPLIT':
                 box.prop(props, "mesh_strip_gap_factor")
-            if mesh_mode != 'INDIVIDUAL':
+            elif mesh_mode == 'TREE':
+                box.prop(props, "mesh_tree_alpha_factor")
+            if mesh_mode not in ('INDIVIDUAL', 'TREE'):
                 box.prop(props, "mesh_panel_resolution")
             box.prop(props, "mesh_bone_subdivisions")
             box.prop(props, "mesh_ribbon_width")
