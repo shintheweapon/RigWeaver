@@ -449,11 +449,10 @@ class BONE_OT_generate_mesh(Operator):
                     obj = _create_mesh_object(
                         f"BoneMesh_{chain[0].name}", verts, faces, source_obj, context
                     )
-                    if props.mesh_assign_vertex_groups:
+                    if props.mesh_auto_rig:
                         _assign_bone_vertex_groups(obj, verts, [chain])
-                        if props.mesh_add_armature_modifier:
-                            mod = obj.modifiers.new(name="Armature", type='ARMATURE')
-                            mod.object = source_obj
+                        mod = obj.modifiers.new(name="Armature", type='ARMATURE')
+                        mod.object = source_obj
                     created.append(obj)
 
             if not created:
@@ -527,11 +526,10 @@ class BONE_OT_generate_mesh(Operator):
 
         obj = _create_mesh_object("BoneMesh", all_verts, all_faces, source_obj, context)
 
-        if props.mesh_assign_vertex_groups:
+        if props.mesh_auto_rig:
             _assign_bone_vertex_groups(obj, all_verts, chains_used)
-            if props.mesh_add_armature_modifier:
-                mod = obj.modifiers.new(name="Armature", type='ARMATURE')
-                mod.object = source_obj
+            mod = obj.modifiers.new(name="Armature", type='ARMATURE')
+            mod.object = source_obj
 
         bpy.ops.pose.select_all(action='DESELECT')
         context.view_layer.objects.active = obj
