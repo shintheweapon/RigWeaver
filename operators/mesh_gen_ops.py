@@ -443,24 +443,47 @@ class BONE_OT_generate_mesh(Operator):
     def execute(self, context):
         props = context.scene.bone_util_props
         selected = set(context.selected_pose_bones)
-
-        # --- Build and sort chains ---
         chains = _build_chains(selected)
         if not chains:
             self.report({'ERROR'}, "RigProxy: No chains found in selection.")
             return {'CANCELLED'}
 
         source_obj = context.object
+        mode = props.mesh_mode
 
         # ------------------------------------------------------------------
-        # Individual chains, split into separate objects
+        # Single chain → always a ribbon regardless of mode
         # ------------------------------------------------------------------
-        if len(chains) > 1 and props.mesh_individual_chains and props.mesh_split_objects:
+        if len(chains) == 1:
+            verts: list[Vector] = []
+            faces: list[tuple[int, ...]] = []
+            _ribbon_from_chain(chains[0], props.mesh_ribbon_width,
+                               props.mesh_bone_subdivisions, verts, faces)
+            if not faces:
+                self.report({'ERROR'}, "RigProxy: No geometry could be generated.")
+                return {'CANCELLED'}
+            if props.mesh_triangulate:
+                faces = _triangulate_faces(faces)
+            obj = _create_mesh_object("BoneMesh", verts, faces, source_obj, context)
+            if props.mesh_auto_rig:
+                _assign_bone_vertex_groups(obj, verts, chains)
+                obj.modifiers.new(name="Armature", type='ARMATURE').object = source_obj
+            bpy.ops.pose.select_all(action='DESELECT')
+            context.view_layer.objects.active = obj
+            obj.select_set(True)
+            self.report({'INFO'}, f"RigProxy: Created '{obj.name}'.")
+            return {'FINISHED'}
+
+        # ------------------------------------------------------------------
+        # INDIVIDUAL + Separate Objects → one object per chain
+        # ------------------------------------------------------------------
+        if mode == 'INDIVIDUAL' and props.mesh_split_objects:
             created: list = []
             for chain in chains:
-                verts: list[Vector] = []
-                faces: list[tuple[int, ...]] = []
-                _ribbon_from_chain(chain, props.mesh_ribbon_width, props.mesh_bone_subdivisions, verts, faces)
+                verts = []
+                faces = []
+                _ribbon_from_chain(chain, props.mesh_ribbon_width,
+                                   props.mesh_bone_subdivisions, verts, faces)
                 if props.mesh_triangulate:
                     faces = _triangulate_faces(faces)
                 if faces:
@@ -469,43 +492,33 @@ class BONE_OT_generate_mesh(Operator):
                     )
                     if props.mesh_auto_rig:
                         _assign_bone_vertex_groups(obj, verts, [chain])
-                        mod = obj.modifiers.new(name="Armature", type='ARMATURE')
-                        mod.object = source_obj
+                        obj.modifiers.new(name="Armature", type='ARMATURE').object = source_obj
                     created.append(obj)
-
             if not created:
                 self.report({'ERROR'}, "RigProxy: No geometry could be generated.")
                 return {'CANCELLED'}
-
             bpy.ops.pose.select_all(action='DESELECT')
             for obj in created:
                 obj.select_set(True)
             context.view_layer.objects.active = created[-1]
-
-            self.report(
-                {'INFO'},
-                f"RigProxy: Created {len(created)} object(s) from {len(chains)} chain(s).",
-            )
+            self.report({'INFO'},
+                        f"RigProxy: Created {len(created)} object(s) from {len(chains)} chain(s).")
             return {'FINISHED'}
 
         # ------------------------------------------------------------------
-        # All other modes → build into a single combined object
+        # All other modes → single combined object
         # ------------------------------------------------------------------
         all_verts: list[Vector] = []
         all_faces: list[tuple[int, ...]] = []
         chains_used: list[list] = []
 
-        if len(chains) == 1:
-            # Single chain → ribbon using bone local X axis for width
-            _ribbon_from_chain(chains[0], props.mesh_ribbon_width, props.mesh_bone_subdivisions, all_verts, all_faces)
-            chains_used.extend(chains)
-        elif props.mesh_individual_chains:
-            # Individual mode, merged → one ribbon per chain combined
+        if mode == 'INDIVIDUAL':
             for chain in chains:
-                _ribbon_from_chain(chain, props.mesh_ribbon_width, props.mesh_bone_subdivisions, all_verts, all_faces)
+                _ribbon_from_chain(chain, props.mesh_ribbon_width,
+                                   props.mesh_bone_subdivisions, all_verts, all_faces)
             chains_used.extend(chains)
-        else:
-            # Connected mode → cross-section surface between adjacent chains.
+
+        else:  # SURFACE, SURFACE_LOOP, SURFACE_SPLIT
             first_parent = chains[0][0].parent
             common_parent = (
                 first_parent
@@ -513,26 +526,20 @@ class BONE_OT_generate_mesh(Operator):
                 else None
             )
             sorted_chains = _sort_chains(chains, common_parent)
-
             strips = (
                 _split_into_strips(sorted_chains, props.mesh_strip_gap_factor)
-                if props.mesh_auto_split_strips
+                if mode == 'SURFACE_SPLIT'
                 else [sorted_chains]
             )
-            # close_mesh_loop is suppressed per-strip when auto-split is on
-            loop = props.close_mesh_loop and not props.mesh_auto_split_strips
+            loop = (mode == 'SURFACE_LOOP')
             for strip in strips:
                 if len(strip) == 1:
                     _ribbon_from_chain(strip[0], props.mesh_ribbon_width,
-                                       props.mesh_bone_subdivisions,
-                                       all_verts, all_faces)
+                                       props.mesh_bone_subdivisions, all_verts, all_faces)
                 else:
                     _cross_section_mesh(
-                        strip,
-                        loop,
-                        props.mesh_panel_resolution,
-                        all_verts,
-                        all_faces,
+                        strip, loop, props.mesh_panel_resolution,
+                        all_verts, all_faces,
                         subdivisions=props.mesh_bone_subdivisions,
                     )
                 chains_used.extend(strip)
@@ -545,21 +552,16 @@ class BONE_OT_generate_mesh(Operator):
             all_faces = _triangulate_faces(all_faces)
 
         obj = _create_mesh_object("BoneMesh", all_verts, all_faces, source_obj, context)
-
         if props.mesh_auto_rig:
             _assign_bone_vertex_groups(obj, all_verts, chains_used)
-            mod = obj.modifiers.new(name="Armature", type='ARMATURE')
-            mod.object = source_obj
+            obj.modifiers.new(name="Armature", type='ARMATURE').object = source_obj
 
         bpy.ops.pose.select_all(action='DESELECT')
         context.view_layer.objects.active = obj
         obj.select_set(True)
-
-        self.report(
-            {'INFO'},
-            f"RigProxy: Created '{obj.name}' with {len(all_faces)} face(s) "
-            f"from {len(chains)} chain(s).",
-        )
+        self.report({'INFO'},
+                    f"RigProxy: Created '{obj.name}' with {len(all_faces)} face(s) "
+                    f"from {len(chains)} chain(s).")
         return {'FINISHED'}
 
 
