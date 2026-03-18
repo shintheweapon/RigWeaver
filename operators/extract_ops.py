@@ -65,12 +65,22 @@ class BoneUtilProperties(PropertyGroup):
         default=False,
     )
     mesh_panel_resolution: IntProperty(
-        name="Panel Resolution",
+        name="Column Resolution",
         description=(
-            "Number of quad columns per panel between adjacent chains. "
-            "1 = one column, 2+ = interpolated columns for denser simulation mesh"
+            "Quad columns per panel in the lateral direction (between adjacent chains). "
+            "1 = single column."
         ),
         default=2,
+        min=1,
+        max=16,
+    )
+    mesh_bone_subdivisions: IntProperty(
+        name="Row Resolution",
+        description=(
+            "Subdivisions per bone segment in the longitudinal direction (along the chain). "
+            "1 = one row per bone, 2+ = interpolated rows within each segment."
+        ),
+        default=1,
         min=1,
         max=16,
     )

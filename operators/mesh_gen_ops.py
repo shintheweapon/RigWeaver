@@ -158,27 +158,37 @@ def _assign_bone_vertex_groups(
                     vg.add([vi], weight, 'REPLACE')
 
 
-def _chain_levels(chain: list) -> list[Vector]:
+def _chain_levels(chain: list, subdivisions: int = 1) -> list[Vector]:
     """
-    Return N+2 world-space positions for the cross-section mesh rows (N bones).
+    Return world-space row positions for the cross-section mesh.
 
-    Top row:    0.5 bone-lengths before the first bone's root (extends outward).
-    Middle rows: midpoint of each bone — each quad straddles a bone junction.
-    Bottom row: 0.5 bone-lengths past  the last  bone's tip  (extends outward).
-
-    Produces N+1 quads for N bones (one more than the previous junction scheme).
+    With subdivisions=1 (default): N+2 levels for N bones — one extension
+    before the first bone, one midpoint per bone, one extension after the last.
+    With subdivisions>1: each segment between consecutive base levels is split
+    into that many equal parts, giving (N+1)*subdivisions + 1 total levels.
     """
     v_first = Vector(chain[0].tail)  - Vector(chain[0].head)
     v_last  = Vector(chain[-1].tail) - Vector(chain[-1].head)
     ext_top    = Vector(chain[0].head)  - v_first * 0.5
     ext_bottom = Vector(chain[-1].tail) + v_last  * 0.5
     midpoints  = [(Vector(b.head) + Vector(b.tail)) * 0.5 for b in chain]
-    return [ext_top] + midpoints + [ext_bottom]
+    base_levels = [ext_top] + midpoints + [ext_bottom]
+
+    if subdivisions <= 1:
+        return base_levels
+
+    result = [base_levels[0]]
+    for i in range(len(base_levels) - 1):
+        a, b = base_levels[i], base_levels[i + 1]
+        for s in range(1, subdivisions + 1):
+            result.append(a.lerp(b, s / subdivisions))
+    return result
 
 
 def _ribbon_from_chain(
     chain: list,
     width: float,
+    subdivisions: int,
     vert_list: list[Vector],
     face_list: list[tuple[int, ...]],
 ) -> None:
@@ -187,13 +197,19 @@ def _ribbon_from_chain(
 
     Vertices are offset ±half_width along each bone's local X axis
     (world-space), which is perpendicular to the bone length direction.
+    subdivisions controls how many rows each bone segment is split into.
     """
     half = width / 2.0
     base = len(vert_list)
 
-    cross_sections: list[tuple[Vector, Vector]] = [
-        (Vector(b.head), Vector(b.x_axis)) for b in chain
-    ]
+    cross_sections: list[tuple[Vector, Vector]] = []
+    for bone in chain:
+        head_pos  = Vector(bone.head)
+        tail_pos  = Vector(bone.tail)
+        x_axis    = Vector(bone.x_axis)
+        for s in range(subdivisions):
+            t = s / subdivisions
+            cross_sections.append((head_pos.lerp(tail_pos, t), x_axis))
     last = chain[-1]
     cross_sections.append((Vector(last.tail), Vector(last.x_axis)))
 
@@ -303,6 +319,7 @@ def _cross_section_mesh(
     resolution: int,
     vert_list: list[Vector],
     face_list: list[tuple[int, ...]],
+    subdivisions: int = 1,
 ) -> None:
     """
     Build a connected cross-section mesh from multiple chains of any length.
@@ -313,11 +330,12 @@ def _cross_section_mesh(
     chains (vs N-1 in an edge-aligned scheme) and each bone runs through the
     centre of its panel — matching the single-chain ribbon behaviour.
 
-    close_loop: connect last chain back to first (cylindrical surfaces, N≥3).
-    resolution: quad columns per panel (1 = one column, default 2+).
+    close_loop:   connect last chain back to first (cylindrical surfaces, N≥3).
+    resolution:   quad columns per panel in the lateral direction.
+    subdivisions: row subdivisions per bone segment in the longitudinal direction.
     """
     N = len(chains)
-    all_levels = [_chain_levels(c) for c in chains]
+    all_levels = [_chain_levels(c, subdivisions) for c in chains]
     use_loop = close_loop and N >= 3
 
     def _pos(levels, d):
@@ -442,7 +460,7 @@ class BONE_OT_generate_mesh(Operator):
             for chain in chains:
                 verts: list[Vector] = []
                 faces: list[tuple[int, ...]] = []
-                _ribbon_from_chain(chain, props.mesh_ribbon_width, verts, faces)
+                _ribbon_from_chain(chain, props.mesh_ribbon_width, props.mesh_bone_subdivisions, verts, faces)
                 if props.mesh_triangulate:
                     faces = _triangulate_faces(faces)
                 if faces:
@@ -479,12 +497,12 @@ class BONE_OT_generate_mesh(Operator):
 
         if len(chains) == 1:
             # Single chain → ribbon using bone local X axis for width
-            _ribbon_from_chain(chains[0], props.mesh_ribbon_width, all_verts, all_faces)
+            _ribbon_from_chain(chains[0], props.mesh_ribbon_width, props.mesh_bone_subdivisions, all_verts, all_faces)
             chains_used.extend(chains)
         elif props.mesh_individual_chains:
             # Individual mode, merged → one ribbon per chain combined
             for chain in chains:
-                _ribbon_from_chain(chain, props.mesh_ribbon_width, all_verts, all_faces)
+                _ribbon_from_chain(chain, props.mesh_ribbon_width, props.mesh_bone_subdivisions, all_verts, all_faces)
             chains_used.extend(chains)
         else:
             # Connected mode → cross-section surface between adjacent chains.
@@ -506,6 +524,7 @@ class BONE_OT_generate_mesh(Operator):
             for strip in strips:
                 if len(strip) == 1:
                     _ribbon_from_chain(strip[0], props.mesh_ribbon_width,
+                                       props.mesh_bone_subdivisions,
                                        all_verts, all_faces)
                 else:
                     _cross_section_mesh(
@@ -514,6 +533,7 @@ class BONE_OT_generate_mesh(Operator):
                         props.mesh_panel_resolution,
                         all_verts,
                         all_faces,
+                        subdivisions=props.mesh_bone_subdivisions,
                     )
                 chains_used.extend(strip)
 
