@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 
 import bpy
-from bpy.props import BoolProperty, FloatProperty, IntProperty, StringProperty
+from bpy.props import BoolProperty, EnumProperty, FloatProperty, IntProperty, StringProperty
 from bpy.types import Operator, PropertyGroup
 from mathutils import Vector
 
@@ -38,13 +38,21 @@ class BoneUtilProperties(PropertyGroup):
         ),
         default=False,
     )
-    mesh_individual_chains: BoolProperty(
-        name="Individual Chains",
-        description=(
-            "Generate a separate ribbon strip for each chain instead of a "
-            "connected cross-section surface (ignored for single-chain selections)"
-        ),
-        default=False,
+    mesh_mode: EnumProperty(
+        name="Mode",
+        items=[
+            ('INDIVIDUAL',    "Individual Strips",
+             "One ribbon per chain (hair, fur, loose strands)"),
+            ('SURFACE',       "Connected Surface",
+             "Panels between sorted adjacent chains (flat panels, even chain spacing)"),
+            ('SURFACE_LOOP',  "Connected Loop",
+             "Closed surface, last chain connects back to first (skirts, rings, cylinders)"),
+            ('SURFACE_SPLIT', "Auto-Split Surface",
+             "Connected surface with automatic gap detection (inner/outer loop layouts, box pleats)"),
+        ('TREE',          "Tree Surface",
+             "Sample-point triangulation for branching or irregular layouts (capes, fans)"),
+        ],
+        default='SURFACE',
     )
     mesh_split_objects: BoolProperty(
         name="Separate Objects",
@@ -57,11 +65,6 @@ class BoneUtilProperties(PropertyGroup):
     mesh_triangulate: BoolProperty(
         name="Triangulate",
         description="Convert all quad faces to triangles in the generated mesh",
-        default=False,
-    )
-    close_mesh_loop: BoolProperty(
-        name="Close Loop",
-        description="Connect last chain back to first (for skirts / rings)",
         default=False,
     )
     mesh_panel_resolution: IntProperty(
@@ -92,15 +95,6 @@ class BoneUtilProperties(PropertyGroup):
         soft_max=1.0,
         unit='LENGTH',
     )
-    mesh_auto_split_strips: BoolProperty(
-        name="Auto Split Strips",
-        description=(
-            "Automatically split chains into separate strips when a large gap "
-            "between adjacent chains is detected. Use for skirts with inner and "
-            "outer loops that should not be bridged."
-        ),
-        default=False,
-    )
     mesh_strip_gap_factor: FloatProperty(
         name="Gap Factor",
         description=(
@@ -109,6 +103,16 @@ class BoneUtilProperties(PropertyGroup):
         ),
         default=2.0,
         min=1.1,
+        soft_max=10.0,
+    )
+    mesh_tree_alpha_factor: FloatProperty(
+        name="Bridge Filter",
+        description=(
+            "Circumradius threshold as a multiple of the median edge length. "
+            "Higher values keep more triangles; lower values prune long bridging edges."
+        ),
+        default=2.0,
+        min=0.1,
         soft_max=10.0,
     )
     mesh_auto_rig: BoolProperty(

@@ -70,15 +70,16 @@ class VIEW3D_PT_bone_util(Panel):
             row.label(text="Requires Pose Mode", icon='INFO')
             box.operator("object.mode_set", text="Enter Pose Mode", icon='POSE_HLT').mode = 'POSE'
         else:
-            box.prop(props, "mesh_individual_chains")
-            if props.mesh_individual_chains:
+            box.prop(props, "mesh_mode")
+            mesh_mode = props.mesh_mode
+            if mesh_mode == 'INDIVIDUAL':
                 box.prop(props, "mesh_split_objects")
-            box.prop(props, "close_mesh_loop")
-            if not props.mesh_individual_chains:
-                box.prop(props, "mesh_auto_split_strips")
-                if props.mesh_auto_split_strips:
-                    box.prop(props, "mesh_strip_gap_factor")
-            box.prop(props, "mesh_panel_resolution")
+            elif mesh_mode == 'SURFACE_SPLIT':
+                box.prop(props, "mesh_strip_gap_factor")
+            elif mesh_mode == 'TREE':
+                box.prop(props, "mesh_tree_alpha_factor")
+            if mesh_mode not in ('INDIVIDUAL', 'TREE'):
+                box.prop(props, "mesh_panel_resolution")
             box.prop(props, "mesh_bone_subdivisions")
             box.prop(props, "mesh_ribbon_width")
             box.prop(props, "mesh_triangulate")
