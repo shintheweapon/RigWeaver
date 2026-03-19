@@ -454,8 +454,19 @@ def _bowyer_watson(pts2d: list[tuple[float, float]]) -> list[tuple[int, int, int
                 continue
             triangles.append([ei, ej, pi, c[0], c[1], c[2]])
 
-    return [(t[0], t[1], t[2]) for t in triangles
-            if not (super_idx & {t[0], t[1], t[2]})]
+    result = []
+    for t in triangles:
+        if super_idx & {t[0], t[1], t[2]}:
+            continue
+        i, j, k = t[0], t[1], t[2]
+        ax, ay = pts[i]
+        bx, by = pts[j]
+        cx, cy = pts[k]
+        # Signed area positive = CCW; swap i,j to enforce CCW winding
+        if (bx - ax) * (cy - ay) - (by - ay) * (cx - ax) < 0:
+            i, j = j, i
+        result.append((i, j, k))
+    return result
 
 
 def _alpha_filter(
@@ -585,6 +596,7 @@ def _create_mesh_object(
     """
     mesh = bpy.data.meshes.new(name)
     mesh.from_pydata([v.to_tuple() for v in verts], [], faces)
+    mesh.validate(verbose=False)
     mesh.update()
     obj = bpy.data.objects.new(name, mesh)
     for coll in source_obj.users_collection:
@@ -617,6 +629,7 @@ def _replace_mesh_data(
     old_mesh = obj.data
     new_mesh = bpy.data.meshes.new(old_mesh.name)
     new_mesh.from_pydata([v.to_tuple() for v in verts], [], faces)
+    new_mesh.validate(verbose=False)
     new_mesh.update()
     obj.data = new_mesh
     bpy.data.meshes.remove(old_mesh)
