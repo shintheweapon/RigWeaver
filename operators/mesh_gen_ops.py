@@ -794,7 +794,7 @@ class BONE_OT_generate_mesh(Operator):
                 return {'CANCELLED'}
             if props.mesh_triangulate:
                 faces = _triangulate_faces(faces)
-            obj = _create_mesh_object("BoneMesh", verts, faces, source_obj, context)
+            obj = _create_mesh_object(props.mesh_output_name, verts, faces, source_obj, context)
             _apply_post_processing(obj, verts, uvs, chains, props, source_obj)
             bpy.ops.pose.select_all(action='DESELECT')
             context.view_layer.objects.active = obj
@@ -817,7 +817,7 @@ class BONE_OT_generate_mesh(Operator):
                     faces = _triangulate_faces(faces)
                 if faces:
                     obj = _create_mesh_object(
-                        f"BoneMesh_{chain[0].name}", verts, faces, source_obj, context
+                        f"{props.mesh_output_name}_{chain[0].name}", verts, faces, source_obj, context
                     )
                     _apply_post_processing(obj, verts, uvs, [chain], props, source_obj)
                     created.append(obj)
@@ -841,7 +841,7 @@ class BONE_OT_generate_mesh(Operator):
             return {'CANCELLED'}
         all_verts, all_faces, all_uvs, chains_used = result
 
-        obj = _create_mesh_object("BoneMesh", all_verts, all_faces, source_obj, context)
+        obj = _create_mesh_object(props.mesh_output_name, all_verts, all_faces, source_obj, context)
         _apply_post_processing(obj, all_verts, all_uvs, chains_used, props, source_obj)
 
         bpy.ops.pose.select_all(action='DESELECT')
@@ -917,7 +917,7 @@ class BONE_OT_update_mesh(Operator):
                     faces = _triangulate_faces(faces)
                 if not faces:
                     continue
-                target_name = f"BoneMesh_{chain[0].name}"
+                target_name = f"{props.mesh_output_name}_{chain[0].name}"
                 existing = next((o for o in tagged if o.name == target_name), None)
                 if existing:
                     _replace_mesh_data(existing, verts, faces)
@@ -946,6 +946,8 @@ class BONE_OT_update_mesh(Operator):
 
         target = tagged[0]
         _replace_mesh_data(target, all_verts, all_faces)
+        target.name = props.mesh_output_name
+        target.data.name = props.mesh_output_name
         _apply_post_processing(
             target, all_verts, all_uvs, chains_used, props, source_obj,
             reuse_armature_mod=True)

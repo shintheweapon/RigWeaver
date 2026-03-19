@@ -148,6 +148,14 @@ class BoneUtilProperties(PropertyGroup):
         description="Create a UVMap layer on the generated mesh (U=lateral, V=longitudinal)",
         default=False,
     )
+    mesh_output_name: StringProperty(
+        name="Output Name",
+        description=(
+            "Base name for generated mesh object(s). "
+            "In Separate Objects mode this becomes a prefix: OutputName_BoneName"
+        ),
+        default="BoneMesh",
+    )
     # JSON-serialised list of weighted bone names, cached between runs
     last_weighted_bones: StringProperty(default="[]")
 
