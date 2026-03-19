@@ -590,6 +590,7 @@ def _create_mesh_object(
     for coll in source_obj.users_collection:
         coll.objects.link(obj)
     obj.matrix_world = Matrix.Identity(4)
+    obj["bone_util_source"] = source_obj.name
     return obj
 
 
@@ -606,6 +607,22 @@ def _assign_uvs(
 # ---------------------------------------------------------------------------
 # Operator
 # ---------------------------------------------------------------------------
+
+def _replace_mesh_data(
+    obj: "bpy.types.Object",
+    verts: list[Vector],
+    faces: list[tuple[int, ...]],
+) -> None:
+    """Swap the geometry of an existing mesh object in-place, preserving the object."""
+    old_mesh = obj.data
+    new_mesh = bpy.data.meshes.new(old_mesh.name)
+    new_mesh.from_pydata([v.to_tuple() for v in verts], [], faces)
+    new_mesh.update()
+    obj.data = new_mesh
+    bpy.data.meshes.remove(old_mesh)
+    # Clear vertex groups so auto-rig re-assignment starts from a clean slate
+    obj.vertex_groups.clear()
+
 
 class BONE_OT_generate_mesh(Operator):
     """Generate a low-poly quad mesh from the selected pose bones"""
@@ -773,11 +790,176 @@ class BONE_OT_generate_mesh(Operator):
         return {'FINISHED'}
 
 
+class BONE_OT_update_mesh(Operator):
+    """Regenerate geometry of existing BoneMesh object(s) in-place, preserving modifiers"""
+    bl_idname = "bone_util.update_mesh"
+    bl_label = "Update Mesh"
+    bl_description = (
+        "Regenerate geometry of existing BoneMesh object(s) from this armature "
+        "using current settings and selected bones, preserving modifiers and transforms"
+    )
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        if context.mode != 'POSE':
+            return False
+        obj = context.object
+        if obj is None or obj.type != 'ARMATURE':
+            return False
+        if not context.selected_pose_bones:
+            return False
+        name = obj.name
+        return any(
+            o.get("bone_util_source") == name
+            for o in bpy.data.objects
+            if o.type == 'MESH'
+        )
+
+    def execute(self, context):
+        props = context.scene.bone_util_props
+        selected = set(context.selected_pose_bones)
+        chains = _build_chains(selected)
+        if not chains:
+            self.report({'ERROR'}, "RigProxy: No chains found in selection.")
+            return {'CANCELLED'}
+
+        source_obj = context.object
+        mode = props.mesh_mode
+
+        tagged = [
+            o for o in bpy.data.objects
+            if o.type == 'MESH' and o.get("bone_util_source") == source_obj.name
+        ]
+
+        # ------------------------------------------------------------------
+        # INDIVIDUAL + Separate Objects → match by name, create if missing
+        # ------------------------------------------------------------------
+        if mode == 'INDIVIDUAL' and props.mesh_split_objects:
+            updated, created = 0, 0
+            for chain in chains:
+                verts: list[Vector] = []
+                faces: list[tuple[int, ...]] = []
+                uvs: list[tuple[float, float]] | None = (
+                    [] if props.mesh_generate_uvs else None
+                )
+                _ribbon_from_chain(chain, props.mesh_ribbon_width,
+                                   props.mesh_bone_subdivisions, verts, faces, uvs)
+                if props.mesh_triangulate:
+                    faces = _triangulate_faces(faces)
+                if not faces:
+                    continue
+                target_name = f"BoneMesh_{chain[0].name}"
+                existing = next((o for o in tagged if o.name == target_name), None)
+                if existing:
+                    _replace_mesh_data(existing, verts, faces)
+                    if uvs:
+                        _assign_uvs(existing, uvs)
+                    if props.mesh_auto_rig:
+                        _assign_bone_vertex_groups(
+                            existing, verts, [chain], props.mesh_envelope_factor)
+                        if not any(m.type == 'ARMATURE' for m in existing.modifiers):
+                            existing.modifiers.new(
+                                "Armature", 'ARMATURE').object = source_obj
+                    updated += 1
+                else:
+                    obj = _create_mesh_object(
+                        target_name, verts, faces, source_obj, context)
+                    if uvs:
+                        _assign_uvs(obj, uvs)
+                    if props.mesh_auto_rig:
+                        _assign_bone_vertex_groups(
+                            obj, verts, [chain], props.mesh_envelope_factor)
+                        obj.modifiers.new("Armature", 'ARMATURE').object = source_obj
+                    created += 1
+            self.report(
+                {'INFO'},
+                f"RigProxy: Updated {updated}, created {created} object(s).")
+            return {'FINISHED'}
+
+        # ------------------------------------------------------------------
+        # All other modes → update the first tagged object in-place
+        # ------------------------------------------------------------------
+        all_verts: list[Vector] = []
+        all_faces: list[tuple[int, ...]] = []
+        all_uvs: list[tuple[float, float]] | None = (
+            [] if props.mesh_generate_uvs else None
+        )
+        chains_used: list[list] = []
+
+        if mode == 'INDIVIDUAL':
+            for chain in chains:
+                _ribbon_from_chain(chain, props.mesh_ribbon_width,
+                                   props.mesh_bone_subdivisions,
+                                   all_verts, all_faces, all_uvs)
+            chains_used.extend(chains)
+
+        elif mode in ('SURFACE', 'SURFACE_LOOP', 'SURFACE_SPLIT'):
+            first_parent = chains[0][0].parent
+            common_parent = (
+                first_parent
+                if all(c[0].parent == first_parent for c in chains)
+                else None
+            )
+            sorted_chains = _sort_chains(chains, common_parent)
+            strips = (
+                _split_into_strips(sorted_chains, props.mesh_strip_gap_factor)
+                if mode == 'SURFACE_SPLIT'
+                else [sorted_chains]
+            )
+            loop = (mode == 'SURFACE_LOOP')
+            for strip in strips:
+                if len(strip) == 1:
+                    _ribbon_from_chain(strip[0], props.mesh_ribbon_width,
+                                       props.mesh_bone_subdivisions,
+                                       all_verts, all_faces, all_uvs)
+                else:
+                    _cross_section_mesh(
+                        strip, loop, props.mesh_panel_resolution,
+                        all_verts, all_faces,
+                        subdivisions=props.mesh_bone_subdivisions,
+                        uv_list=all_uvs,
+                    )
+                chains_used.extend(strip)
+
+        elif mode == 'TREE':
+            _tree_surface_mesh(
+                chains, props.mesh_bone_subdivisions, props.mesh_tree_alpha_factor,
+                all_verts, all_faces, all_uvs,
+            )
+            chains_used.extend(chains)
+
+        if not all_faces:
+            self.report({'ERROR'}, "RigProxy: No geometry could be generated.")
+            return {'CANCELLED'}
+        if props.mesh_triangulate:
+            all_faces = _triangulate_faces(all_faces)
+
+        target = tagged[0]
+        _replace_mesh_data(target, all_verts, all_faces)
+        if all_uvs:
+            _assign_uvs(target, all_uvs)
+        if props.mesh_auto_rig:
+            _assign_bone_vertex_groups(
+                target, all_verts, chains_used, props.mesh_envelope_factor)
+            if not any(m.type == 'ARMATURE' for m in target.modifiers):
+                target.modifiers.new("Armature", 'ARMATURE').object = source_obj
+
+        bpy.ops.pose.select_all(action='DESELECT')
+        context.view_layer.objects.active = target
+        target.select_set(True)
+        self.report(
+            {'INFO'},
+            f"RigProxy: Updated '{target.name}' with {len(all_faces)} face(s) "
+            f"from {len(chains)} chain(s).")
+        return {'FINISHED'}
+
+
 # ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
 
-classes = (BONE_OT_generate_mesh,)
+classes = (BONE_OT_generate_mesh, BONE_OT_update_mesh)
 
 
 def register():
