@@ -236,7 +236,9 @@ class BONE_OT_generate_rig_from_mesh(Operator):
         # ── 7. Create bones ───────────────────────────────────────────────────
         all_bone_name_chains: list[list[str]] = []
         for ci in range(n_chains):
-            levels = bone_levels[ci]
+            # Reverse so level[0] = h_max (waist/top) → root bone HEAD there,
+            # and level[-1] = h_min (hem/bottom) → chain tips point downward.
+            levels = list(reversed(bone_levels[ci]))
             chain_names: list[str] = []
             prev_eb = None
             for li in range(n_levels - 1):
