@@ -1,14 +1,14 @@
 """
-RigProxy
+RigWeaver
 Bone extraction and simulation proxy mesh tools.
 """
 
 bl_info = {
-    "name": "RigProxy",
+    "name": "RigWeaver",
     "author": "theweapon",
     "version": (0, 1, 0),
     "blender": (4, 5, 0),
-    "location": "View3D > Sidebar > RigProxy",
+    "location": "View3D > Sidebar > RigWeaver",
     "description": "Bone extraction and simulation proxy mesh tools",
     "category": "Rigging",
 }

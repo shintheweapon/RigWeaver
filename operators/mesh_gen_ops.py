@@ -620,7 +620,7 @@ def _create_mesh_object(
     for coll in source_obj.users_collection:
         coll.objects.link(obj)
     obj.matrix_world = Matrix.Identity(4)
-    obj["bone_util_source"] = source_obj.name
+    obj["rig_weaver_source"] = source_obj.name
     return obj
 
 
@@ -774,7 +774,7 @@ def _apply_post_processing(
 
 class BONE_OT_generate_mesh(Operator):
     """Generate a low-poly quad mesh from the selected pose bones"""
-    bl_idname = "bone_util.generate_mesh"
+    bl_idname = "rig_weaver.generate_mesh"
     bl_label = "Generate Bone Mesh"
     bl_description = (
         "Create a surface mesh from the selected bone chains in Pose Mode. "
@@ -793,16 +793,16 @@ class BONE_OT_generate_mesh(Operator):
         )
 
     def execute(self, context):
-        props = context.scene.bone_util_props
+        props = context.scene.rig_weaver_props
 
         if props.mesh_mode == 'TREE' and not _NUMPY_AVAILABLE:
-            self.report({'ERROR'}, "RigProxy: TREE mode requires NumPy — not available in this Blender build.")
+            self.report({'ERROR'}, "RigWeaver: TREE mode requires NumPy — not available in this Blender build.")
             return {'CANCELLED'}
 
         selected = set(context.selected_pose_bones)
         chains = _build_chains(selected)
         if not chains:
-            self.report({'ERROR'}, "RigProxy: No chains found in selection.")
+            self.report({'ERROR'}, "RigWeaver: No chains found in selection.")
             return {'CANCELLED'}
 
         source_obj = context.object
@@ -818,7 +818,7 @@ class BONE_OT_generate_mesh(Operator):
             _ribbon_from_chain(chains[0], props.mesh_ribbon_width,
                                props.mesh_bone_subdivisions, verts, faces, uvs)
             if not faces:
-                self.report({'ERROR'}, "RigProxy: No geometry could be generated.")
+                self.report({'ERROR'}, "RigWeaver: No geometry could be generated.")
                 return {'CANCELLED'}
             if props.mesh_triangulate:
                 faces = _triangulate_faces(faces)
@@ -827,7 +827,7 @@ class BONE_OT_generate_mesh(Operator):
             bpy.ops.pose.select_all(action='DESELECT')
             context.view_layer.objects.active = obj
             obj.select_set(True)
-            self.report({'INFO'}, f"RigProxy: Created '{obj.name}'.")
+            self.report({'INFO'}, f"RigWeaver: Created '{obj.name}'.")
             return {'FINISHED'}
 
         # ------------------------------------------------------------------
@@ -850,14 +850,14 @@ class BONE_OT_generate_mesh(Operator):
                     _apply_post_processing(obj, verts, uvs, [chain], props, source_obj)
                     created.append(obj)
             if not created:
-                self.report({'ERROR'}, "RigProxy: No geometry could be generated.")
+                self.report({'ERROR'}, "RigWeaver: No geometry could be generated.")
                 return {'CANCELLED'}
             bpy.ops.pose.select_all(action='DESELECT')
             for obj in created:
                 obj.select_set(True)
             context.view_layer.objects.active = created[-1]
             self.report({'INFO'},
-                        f"RigProxy: Created {len(created)} object(s) from {len(chains)} chain(s).")
+                        f"RigWeaver: Created {len(created)} object(s) from {len(chains)} chain(s).")
             return {'FINISHED'}
 
         # ------------------------------------------------------------------
@@ -865,7 +865,7 @@ class BONE_OT_generate_mesh(Operator):
         # ------------------------------------------------------------------
         result = _build_geometry(props, chains)
         if result is None:
-            self.report({'ERROR'}, "RigProxy: No geometry could be generated.")
+            self.report({'ERROR'}, "RigWeaver: No geometry could be generated.")
             return {'CANCELLED'}
         all_verts, all_faces, all_uvs, chains_used = result
 
@@ -876,14 +876,14 @@ class BONE_OT_generate_mesh(Operator):
         context.view_layer.objects.active = obj
         obj.select_set(True)
         self.report({'INFO'},
-                    f"RigProxy: Created '{obj.name}' with {len(all_faces)} face(s) "
+                    f"RigWeaver: Created '{obj.name}' with {len(all_faces)} face(s) "
                     f"from {len(chains)} chain(s).")
         return {'FINISHED'}
 
 
 class BONE_OT_update_mesh(Operator):
     """Regenerate geometry of existing BoneMesh object(s) in-place, preserving modifiers"""
-    bl_idname = "bone_util.update_mesh"
+    bl_idname = "rig_weaver.update_mesh"
     bl_label = "Update Mesh"
     bl_description = (
         "Regenerate geometry of existing BoneMesh object(s) from this armature "
@@ -902,22 +902,22 @@ class BONE_OT_update_mesh(Operator):
             return False
         name = obj.name
         return any(
-            o.get("bone_util_source") == name
+            o.get("rig_weaver_source") == name
             for o in bpy.data.objects
             if o.type == 'MESH'
         )
 
     def execute(self, context):
-        props = context.scene.bone_util_props
+        props = context.scene.rig_weaver_props
 
         if props.mesh_mode == 'TREE' and not _NUMPY_AVAILABLE:
-            self.report({'ERROR'}, "RigProxy: TREE mode requires NumPy — not available in this Blender build.")
+            self.report({'ERROR'}, "RigWeaver: TREE mode requires NumPy — not available in this Blender build.")
             return {'CANCELLED'}
 
         selected = set(context.selected_pose_bones)
         chains = _build_chains(selected)
         if not chains:
-            self.report({'ERROR'}, "RigProxy: No chains found in selection.")
+            self.report({'ERROR'}, "RigWeaver: No chains found in selection.")
             return {'CANCELLED'}
 
         source_obj = context.object
@@ -925,7 +925,7 @@ class BONE_OT_update_mesh(Operator):
 
         tagged = [
             o for o in bpy.data.objects
-            if o.type == 'MESH' and o.get("bone_util_source") == source_obj.name
+            if o.type == 'MESH' and o.get("rig_weaver_source") == source_obj.name
         ]
 
         # ------------------------------------------------------------------
@@ -960,7 +960,7 @@ class BONE_OT_update_mesh(Operator):
                     created += 1
             self.report(
                 {'INFO'},
-                f"RigProxy: Updated {updated}, created {created} object(s).")
+                f"RigWeaver: Updated {updated}, created {created} object(s).")
             return {'FINISHED'}
 
         # ------------------------------------------------------------------
@@ -968,7 +968,7 @@ class BONE_OT_update_mesh(Operator):
         # ------------------------------------------------------------------
         result = _build_geometry(props, chains)
         if result is None:
-            self.report({'ERROR'}, "RigProxy: No geometry could be generated.")
+            self.report({'ERROR'}, "RigWeaver: No geometry could be generated.")
             return {'CANCELLED'}
         all_verts, all_faces, all_uvs, chains_used = result
 
@@ -985,7 +985,7 @@ class BONE_OT_update_mesh(Operator):
         target.select_set(True)
         self.report(
             {'INFO'},
-            f"RigProxy: Updated '{target.name}' with {len(all_faces)} face(s) "
+            f"RigWeaver: Updated '{target.name}' with {len(all_faces)} face(s) "
             f"from {len(chains)} chain(s).")
         return {'FINISHED'}
 
@@ -1013,7 +1013,7 @@ def _draw_envelope_circles() -> None:
     if obj is None or obj.type != 'ARMATURE' or obj.mode != 'POSE':
         return
 
-    props = context.scene.bone_util_props
+    props = context.scene.rig_weaver_props
     factor = props.mesh_envelope_factor
     matrix = obj.matrix_world
 
@@ -1053,7 +1053,7 @@ def _draw_envelope_circles() -> None:
 
 
 class BONE_OT_preview_envelope_weights(Operator):
-    bl_idname = "bone_util.preview_envelope_weights"
+    bl_idname = "rig_weaver.preview_envelope_weights"
     bl_label = "Preview Weight Radius"
     bl_description = (
         "Toggle a wireframe overlay in the viewport showing the weight radius "
@@ -1070,7 +1070,7 @@ class BONE_OT_preview_envelope_weights(Operator):
 
     def execute(self, context):
         global _envelope_draw_handle
-        props = context.scene.bone_util_props
+        props = context.scene.rig_weaver_props
 
         if _envelope_draw_handle is not None:
             bpy.types.SpaceView3D.draw_handler_remove(

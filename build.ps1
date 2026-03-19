@@ -1,4 +1,4 @@
-# build.ps1 - Package RigProxy addon for Blender 4.5+ Extensions distribution
+# build.ps1 - Package RigWeaver addon for Blender 4.5+ Extensions distribution
 #
 # Usage:
 #   .\build.ps1

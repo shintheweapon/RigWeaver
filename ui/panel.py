@@ -1,5 +1,5 @@
 """
-N-panel for the Blender Bone Utility addon.
+N-panel for the RigWeaver addon.
 Visible in the 3D Viewport sidebar when the active object is an armature.
 """
 import json
@@ -8,9 +8,9 @@ import bpy
 from bpy.types import Panel
 
 
-class BONE_UL_vg_list(bpy.types.UIList):
+class RIG_WEAVER_UL_vg_list(bpy.types.UIList):
     """Scrollable vertex-group list with checkbox toggle buttons."""
-    bl_idname = "BONE_UL_vg_list"
+    bl_idname = "RIG_WEAVER_UL_vg_list"
     use_filter_show = True
 
     def draw_filter(self, context, layout):
@@ -23,17 +23,17 @@ class BONE_UL_vg_list(bpy.types.UIList):
         selected = set(json.loads(obj.vg_selected_groups))
         chk = 'CHECKBOX_HLT' if vg.name in selected else 'CHECKBOX_DEHLT'
         layout.operator(
-            "bone_util.vg_toggle",
+            "rig_weaver.vg_toggle",
             text=vg.name, icon=chk, emboss=False,
         ).group_name = vg.name
 
 
-class VIEW3D_PT_bone_util(Panel):
-    bl_label = "RigProxy"
-    bl_idname = "VIEW3D_PT_bone_util"
+class VIEW3D_PT_rig_weaver(Panel):
+    bl_label = "RigWeaver"
+    bl_idname = "VIEW3D_PT_rig_weaver"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = "RigProxy"
+    bl_category = "RigWeaver"
 
     @classmethod
     def poll(cls, context):
@@ -41,7 +41,7 @@ class VIEW3D_PT_bone_util(Panel):
 
     def draw(self, context):
         layout = self.layout
-        props = context.scene.bone_util_props
+        props = context.scene.rig_weaver_props
         mode = context.object.mode
 
         # ── Extract ────────────────────────────────────────────────────────
@@ -67,7 +67,7 @@ class VIEW3D_PT_bone_util(Panel):
                 box.prop(props, "connect_child_bones")
                 row = box.row()
                 row.scale_y = 1.3
-                row.operator("bone_util.extract_used_armature", icon='LINKED')
+                row.operator("rig_weaver.extract_used_armature", icon='LINKED')
 
         layout.separator()
 
@@ -120,7 +120,7 @@ class VIEW3D_PT_bone_util(Panel):
                 # Envelope preview toggle
                 preview_icon = 'HIDE_OFF' if props.ui_envelope_preview_active else 'HIDE_ON'
                 box.operator(
-                    "bone_util.preview_envelope_weights",
+                    "rig_weaver.preview_envelope_weights",
                     text="Preview Weight Radius",
                     icon=preview_icon,
                 )
@@ -140,17 +140,17 @@ class VIEW3D_PT_bone_util(Panel):
                 box.prop(props, "mesh_output_name")
                 row = box.row(align=True)
                 row.scale_y = 1.3
-                row.operator("bone_util.generate_mesh", icon='OUTLINER_OB_MESH')
-                row.operator("bone_util.update_mesh", text="Update", icon='FILE_REFRESH')
+                row.operator("rig_weaver.generate_mesh", icon='OUTLINER_OB_MESH')
+                row.operator("rig_weaver.update_mesh", text="Update", icon='FILE_REFRESH')
 
 
 class VIEW3D_PT_vg_select(Panel):
-    """RigProxy — Vertex Group Multi-Select (active mesh in Edit Mode)."""
+    """RigWeaver — Vertex Group Multi-Select (active mesh in Edit Mode)."""
     bl_label      = "Vertex Group Select"
     bl_idname     = "VIEW3D_PT_vg_select"
     bl_space_type  = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category    = "RigProxy"
+    bl_category    = "RigWeaver"
 
     @classmethod
     def poll(cls, context):
@@ -166,13 +166,13 @@ class VIEW3D_PT_vg_select(Panel):
         if obj.mode == 'WEIGHT_PAINT':
             layout.label(text="Previewing mixed weights", icon='HIDE_OFF')
             layout.operator(
-                "bone_util.vg_preview_mix",
+                "rig_weaver.vg_preview_mix",
                 text="Exit Preview",
                 icon='LOOP_BACK',
             )
             layout.separator()
             layout.operator(
-                "bone_util.vg_mix_groups",
+                "rig_weaver.vg_mix_groups",
                 text="Mix into Group",
                 icon='AUTOMERGE_ON',
             )
@@ -185,12 +185,12 @@ class VIEW3D_PT_vg_select(Panel):
 
         # All / None bulk buttons.
         row = layout.row(align=True)
-        row.operator("bone_util.vg_select_all",  text="All")
-        row.operator("bone_util.vg_select_none", text="None")
+        row.operator("rig_weaver.vg_select_all",  text="All")
+        row.operator("rig_weaver.vg_select_none", text="None")
 
         # Scrollable group list (filter rendered inside list header by draw_filter).
         layout.template_list(
-            "BONE_UL_vg_list", "",
+            "RIG_WEAVER_UL_vg_list", "",
             obj, "vertex_groups",
             obj, "vg_active_index",
             rows=6, maxrows=12,
@@ -203,7 +203,7 @@ class VIEW3D_PT_vg_select(Panel):
         box.prop(obj, "vg_mix_blend_mode")
         preview_icon = 'HIDE_OFF' if obj.vg_mix_preview_active else 'HIDE_ON'
         box.operator(
-            "bone_util.vg_preview_mix",
+            "rig_weaver.vg_preview_mix",
             text="Preview Mix",
             icon=preview_icon,
         )
@@ -212,17 +212,17 @@ class VIEW3D_PT_vg_select(Panel):
         box.prop(obj, "vg_mix_remove_srcs")
         row = box.row()
         row.scale_y = 1.3
-        row.operator("bone_util.vg_mix_groups", text="Mix into Group",
+        row.operator("rig_weaver.vg_mix_groups", text="Mix into Group",
                      icon='AUTOMERGE_ON')
 
 
 def register():
-    bpy.utils.register_class(BONE_UL_vg_list)
-    bpy.utils.register_class(VIEW3D_PT_bone_util)
+    bpy.utils.register_class(RIG_WEAVER_UL_vg_list)
+    bpy.utils.register_class(VIEW3D_PT_rig_weaver)
     bpy.utils.register_class(VIEW3D_PT_vg_select)
 
 
 def unregister():
     bpy.utils.unregister_class(VIEW3D_PT_vg_select)
-    bpy.utils.unregister_class(VIEW3D_PT_bone_util)
-    bpy.utils.unregister_class(BONE_UL_vg_list)
+    bpy.utils.unregister_class(VIEW3D_PT_rig_weaver)
+    bpy.utils.unregister_class(RIG_WEAVER_UL_vg_list)

@@ -2,7 +2,7 @@ schema_version = "1.0.0"
 
 id = "armature_extractor"
 version = "0.1.0"
-name = "RigProxy"
+name = "RigWeaver"
 tagline = "Bone extraction and simulation proxy mesh tools"
 maintainer = "theweapon"
 type = "add-on"

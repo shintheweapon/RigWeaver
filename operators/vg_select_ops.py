@@ -1,5 +1,5 @@
 """
-Vertex-group multi-selection and weight mixing for RigProxy.
+Vertex-group multi-selection and weight mixing for RigWeaver.
 
 Selected group names are persisted as a JSON-encoded StringProperty on each
 Object so draw() stays completely read-only.  All mutations happen inside
@@ -15,7 +15,7 @@ from bpy.props import BoolProperty, EnumProperty, IntProperty, StringProperty
 from bpy.types import Operator
 
 # Name of the temporary vertex group used for mix preview.
-_PREVIEW_GROUP = "_RigProxy_Preview"
+_PREVIEW_GROUP = "_RigWeaver_Preview"
 
 
 def _load_selected(obj) -> set[str]:
@@ -112,7 +112,7 @@ def _write_group_weights(
 
 class BONE_OT_vg_toggle(Operator):
     """Toggle this vertex group in/out of the active selection set"""
-    bl_idname = "bone_util.vg_toggle"
+    bl_idname = "rig_weaver.vg_toggle"
     bl_label  = "Toggle Vertex Group"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -148,7 +148,7 @@ class BONE_OT_vg_toggle(Operator):
 
 class BONE_OT_vg_select_all(Operator):
     """Select vertices in all vertex groups"""
-    bl_idname  = "bone_util.vg_select_all"
+    bl_idname  = "rig_weaver.vg_select_all"
     bl_label   = "All"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -169,7 +169,7 @@ class BONE_OT_vg_select_all(Operator):
 
 class BONE_OT_vg_select_none(Operator):
     """Deselect all vertex groups"""
-    bl_idname  = "bone_util.vg_select_none"
+    bl_idname  = "rig_weaver.vg_select_none"
     bl_label   = "None"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -192,7 +192,7 @@ class BONE_OT_vg_select_none(Operator):
 
 class BONE_OT_vg_preview_mix(Operator):
     """Toggle a live Weight Paint preview of the blended vertex group weights"""
-    bl_idname  = "bone_util.vg_preview_mix"
+    bl_idname  = "rig_weaver.vg_preview_mix"
     bl_label   = "Preview Mix"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -215,7 +215,7 @@ class BONE_OT_vg_preview_mix(Operator):
             # --- Toggle ON: compute mix, enter Weight Paint -----------------
             selected_names: set[str] = _load_selected(obj)
             if not selected_names:
-                self.report({'WARNING'}, "RigProxy: No groups checked.")
+                self.report({'WARNING'}, "RigWeaver: No groups checked.")
                 return {'CANCELLED'}
 
             bpy.ops.object.mode_set(mode='OBJECT')
@@ -242,7 +242,7 @@ class BONE_OT_vg_preview_mix(Operator):
 
 class BONE_OT_vg_mix_groups(Operator):
     """Merge checked vertex groups into a single target group"""
-    bl_idname  = "bone_util.vg_mix_groups"
+    bl_idname  = "rig_weaver.vg_mix_groups"
     bl_label   = "Mix into Group"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -257,7 +257,7 @@ class BONE_OT_vg_mix_groups(Operator):
         selected_names: set[str] = _load_selected(obj)
 
         if not selected_names:
-            self.report({'WARNING'}, "RigProxy: No groups checked.")
+            self.report({'WARNING'}, "RigWeaver: No groups checked.")
             return {'CANCELLED'}
 
         bpy.ops.object.mode_set(mode='OBJECT')
@@ -284,7 +284,7 @@ class BONE_OT_vg_mix_groups(Operator):
         bpy.ops.object.mode_set(mode='EDIT')
         self.report(
             {'INFO'},
-            f"RigProxy: Mixed {len(selected_names)} group(s) into '{target_name}'.",
+            f"RigWeaver: Mixed {len(selected_names)} group(s) into '{target_name}'.",
         )
         return {'FINISHED'}
 
@@ -309,7 +309,7 @@ def register():
     # JSON-encoded sorted list of selected vertex group names.
     bpy.types.Object.vg_selected_groups = StringProperty(
         name="VG Selected Groups",
-        description="JSON list of vertex group names active in the RigProxy selector",
+        description="JSON list of vertex group names active in the RigWeaver selector",
         default="[]",
     )
     bpy.types.Object.vg_mix_blend_mode = EnumProperty(

@@ -21,7 +21,7 @@ from mathutils import Vector
 # Properties
 # ---------------------------------------------------------------------------
 
-class BoneUtilProperties(PropertyGroup):
+class RigWeaverProperties(PropertyGroup):
     retarget_meshes: BoolProperty(
         name="Retarget Meshes",
         description=(
@@ -263,7 +263,7 @@ def _find_used_parent(
 
 class BONE_OT_extract_used_armature(Operator):
     """Create a new armature containing only bones that have vertex weights"""
-    bl_idname = "bone_util.extract_used_armature"
+    bl_idname = "rig_weaver.extract_used_armature"
     bl_label = "Extract Used Armature"
     bl_description = (
         "Build a reduced armature from bones that actually deform meshes. "
@@ -281,7 +281,7 @@ class BONE_OT_extract_used_armature(Operator):
 
     def execute(self, context):
         source_obj = context.object
-        props = context.scene.bone_util_props
+        props = context.scene.rig_weaver_props
 
         # --- Determine used bone names ---
         # Reuse cached result if available, otherwise re-analyse
@@ -292,7 +292,7 @@ class BONE_OT_extract_used_armature(Operator):
             used_names = _collect_weighted_names(source_obj)
 
         if not used_names:
-            self.report({'ERROR'}, "RigProxy: No bones with vertex weights found.")
+            self.report({'ERROR'}, "RigWeaver: No bones with vertex weights found.")
             return {'CANCELLED'}
 
         # Filter to bones that actually exist in the armature
@@ -300,7 +300,7 @@ class BONE_OT_extract_used_armature(Operator):
         used_names = used_names & existing
 
         if not used_names:
-            self.report({'ERROR'}, "RigProxy: No matching bones found in armature.")
+            self.report({'ERROR'}, "RigWeaver: No matching bones found in armature.")
             return {'CANCELLED'}
 
         # --- Build parent name map and topo-sorted list BEFORE any mode switches ---
@@ -318,7 +318,7 @@ class BONE_OT_extract_used_armature(Operator):
         source_obj.select_set(True)
         context.view_layer.objects.active = source_obj
         if 'FINISHED' not in bpy.ops.object.mode_set(mode='EDIT'):
-            self.report({'ERROR'}, "RigProxy: Could not enter Edit Mode on source armature.")
+            self.report({'ERROR'}, "RigWeaver: Could not enter Edit Mode on source armature.")
             return {'CANCELLED'}
 
         source_edit_data: dict[str, dict] = {}
@@ -336,7 +336,7 @@ class BONE_OT_extract_used_armature(Operator):
                 pass
 
         if 'FINISHED' not in bpy.ops.object.mode_set(mode='OBJECT'):
-            self.report({'ERROR'}, "RigProxy: Could not return to Object Mode after reading source armature.")
+            self.report({'ERROR'}, "RigWeaver: Could not return to Object Mode after reading source armature.")
             return {'CANCELLED'}
 
         # --- Create new armature object ---
@@ -357,7 +357,7 @@ class BONE_OT_extract_used_armature(Operator):
         new_obj.select_set(True)
         context.view_layer.objects.active = new_obj
         if 'FINISHED' not in bpy.ops.object.mode_set(mode='EDIT'):
-            self.report({'ERROR'}, "RigProxy: Could not enter Edit Mode on new armature.")
+            self.report({'ERROR'}, "RigWeaver: Could not enter Edit Mode on new armature.")
             return {'CANCELLED'}
 
         new_bone_map: dict[str, bpy.types.EditBone] = {}
@@ -432,7 +432,7 @@ class BONE_OT_extract_used_armature(Operator):
 
         # --- Return to Object Mode ---
         if 'FINISHED' not in bpy.ops.object.mode_set(mode='OBJECT'):
-            self.report({'ERROR'}, "RigProxy: Could not return to Object Mode after building new armature.")
+            self.report({'ERROR'}, "RigWeaver: Could not return to Object Mode after building new armature.")
             return {'CANCELLED'}
 
         bpy.ops.object.select_all(action='DESELECT')
@@ -440,7 +440,7 @@ class BONE_OT_extract_used_armature(Operator):
         context.view_layer.objects.active = new_obj
 
         bone_count = len(new_bone_map)
-        self.report({'INFO'}, f"RigProxy: Created '{new_obj.name}' with {bone_count} bone(s).")
+        self.report({'INFO'}, f"RigWeaver: Created '{new_obj.name}' with {bone_count} bone(s).")
 
         # --- Retarget meshes ---
         if props.retarget_meshes:
@@ -464,7 +464,7 @@ class BONE_OT_extract_used_armature(Operator):
             if retarget_count:
                 self.report(
                     {'INFO'},
-                    f"RigProxy: Retargeted {retarget_count} mesh(es) to '{new_obj.name}'.",
+                    f"RigWeaver: Retargeted {retarget_count} mesh(es) to '{new_obj.name}'.",
                 )
 
         return {'FINISHED'}
@@ -474,19 +474,19 @@ class BONE_OT_extract_used_armature(Operator):
 # Registration
 # ---------------------------------------------------------------------------
 
-classes = (BoneUtilProperties, BONE_OT_extract_used_armature)
+classes = (RigWeaverProperties, BONE_OT_extract_used_armature)
 
 
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
-    bpy.types.Scene.bone_util_props = bpy.props.PointerProperty(
-        type=BoneUtilProperties
+    bpy.types.Scene.rig_weaver_props = bpy.props.PointerProperty(
+        type=RigWeaverProperties
     )
 
 
 def unregister():
-    if hasattr(bpy.types.Scene, "bone_util_props"):
-        del bpy.types.Scene.bone_util_props
+    if hasattr(bpy.types.Scene, "rig_weaver_props"):
+        del bpy.types.Scene.rig_weaver_props
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
