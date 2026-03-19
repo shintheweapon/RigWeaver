@@ -64,6 +64,7 @@ class VIEW3D_PT_bone_util(Panel):
             else:
                 box.prop(props, "retarget_meshes")
                 box.prop(props, "auto_bone_orientation")
+                box.prop(props, "connect_child_bones")
                 row = box.row()
                 row.scale_y = 1.3
                 row.operator("bone_util.extract_used_armature", icon='LINKED')
