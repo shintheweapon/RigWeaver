@@ -99,7 +99,7 @@ class RigWeaverProperties(PropertyGroup):
             "Subdivisions per bone segment in the longitudinal direction (along the chain). "
             "1 = one row per bone, 2+ = interpolated rows within each segment."
         ),
-        default=1,
+        default=2,
         min=1,
         max=16,
     )
