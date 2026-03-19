@@ -117,18 +117,16 @@ class VIEW3D_PT_rig_weaver(Panel):
                 row.prop(props, "mesh_triangulate", toggle=True)
                 row.prop(props, "mesh_generate_uvs", toggle=True)
 
-                # Envelope preview toggle
-                preview_icon = 'HIDE_OFF' if props.ui_envelope_preview_active else 'HIDE_ON'
-                box.operator(
-                    "rig_weaver.preview_envelope_weights",
-                    text="Preview Weight Radius",
-                    icon=preview_icon,
-                )
-
                 # Rigging
                 box.prop(props, "mesh_auto_rig")
                 if props.mesh_auto_rig:
                     box.prop(props, "mesh_envelope_factor")
+                    preview_icon = 'HIDE_OFF' if props.ui_envelope_preview_active else 'HIDE_ON'
+                    box.operator(
+                        "rig_weaver.preview_envelope_weights",
+                        text="Preview Weight Radius",
+                        icon=preview_icon,
+                    )
 
                 # Subdivision Surface
                 row = box.row(align=True)
