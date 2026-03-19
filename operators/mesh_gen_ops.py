@@ -1024,10 +1024,10 @@ def _draw_envelope_circles() -> None:
 
 class BONE_OT_preview_envelope_weights(Operator):
     bl_idname = "bone_util.preview_envelope_weights"
-    bl_label = "Preview Envelope"
+    bl_label = "Preview Weight Radius"
     bl_description = (
-        "Toggle a wireframe overlay in the viewport showing the envelope radius "
-        "used for bone weight assignment. Radius = bone length × Envelope Size"
+        "Toggle a wireframe overlay in the viewport showing the weight radius "
+        "used for bone weight assignment. Radius = bone length × Weight Radius"
     )
     bl_options = {'REGISTER'}
 

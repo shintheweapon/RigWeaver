@@ -116,10 +116,10 @@ class BoneUtilProperties(PropertyGroup):
         soft_max=10.0,
     )
     mesh_envelope_factor: FloatProperty(
-        name="Envelope Size",
+        name="Weight Radius",
         description=(
-            "Radius of each bone's weight envelope as a multiple of the bone's length. "
-            "Vertices outside all envelopes fall back to the nearest bone."
+            "Radius of each bone's weight influence as a multiple of the bone's length. "
+            "Vertices outside all influence zones fall back to the nearest bone."
         ),
         default=1.5,
         min=0.1,

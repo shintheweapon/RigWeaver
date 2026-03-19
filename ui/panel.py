@@ -120,7 +120,7 @@ class VIEW3D_PT_bone_util(Panel):
                 preview_icon = 'HIDE_OFF' if props.ui_envelope_preview_active else 'HIDE_ON'
                 box.operator(
                     "bone_util.preview_envelope_weights",
-                    text="Preview Envelope",
+                    text="Preview Weight Radius",
                     icon=preview_icon,
                 )
 
