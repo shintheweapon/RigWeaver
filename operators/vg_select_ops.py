@@ -319,7 +319,7 @@ def register():
             ('ADD',     "Add",     "Sum, clamped to 1.0"),
             ('MIN',     "Min",     "Weakest weight wins"),
         ],
-        default='MAX',
+        default='ADD',
     )
     bpy.types.Object.vg_mix_target_name = StringProperty(
         name="Target Group",
