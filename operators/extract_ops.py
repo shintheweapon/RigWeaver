@@ -252,7 +252,7 @@ class BONE_OT_extract_used_armature(Operator):
             used_names = _collect_weighted_names(source_obj)
 
         if not used_names:
-            self.report({'ERROR'}, "Bone Util: No bones with vertex weights found.")
+            self.report({'ERROR'}, "RigProxy: No bones with vertex weights found.")
             return {'CANCELLED'}
 
         # Filter to bones that actually exist in the armature
@@ -260,7 +260,7 @@ class BONE_OT_extract_used_armature(Operator):
         used_names = used_names & existing
 
         if not used_names:
-            self.report({'ERROR'}, "Bone Util: No matching bones found in armature.")
+            self.report({'ERROR'}, "RigProxy: No matching bones found in armature.")
             return {'CANCELLED'}
 
         # --- Build parent name map and topo-sorted list BEFORE any mode switches ---
@@ -419,7 +419,7 @@ class BONE_OT_extract_used_armature(Operator):
             if retarget_count:
                 self.report(
                     {'INFO'},
-                    f"Bone Util: Retargeted {retarget_count} mesh(es) to '{new_obj.name}'.",
+                    f"RigProxy: Retargeted {retarget_count} mesh(es) to '{new_obj.name}'.",
                 )
 
         return {'FINISHED'}

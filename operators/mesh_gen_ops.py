@@ -149,16 +149,20 @@ def _assign_bone_vertex_groups(
     all_bones = [bone for chain in chains for bone in chain]
 
     vgs = []
+    # Pre-convert bone positions to Vectors and compute lengths once (O(B) not O(V*B))
+    bone_data: list[tuple[Vector, Vector, float]] = []
     for bone in all_bones:
         vg = (mesh_obj.vertex_groups.get(bone.name)
               or mesh_obj.vertex_groups.new(name=bone.name))
         vgs.append(vg)
+        head = Vector(bone.head)
+        tail = Vector(bone.tail)
+        bone_data.append((head, tail, (tail - head).length))
 
     for vi, pos in enumerate(verts):
         weights = []
-        for bone in all_bones:
-            d = _distance_to_segment(pos, Vector(bone.head), Vector(bone.tail))
-            bone_len = (Vector(bone.tail) - Vector(bone.head)).length
+        for head, tail, bone_len in bone_data:
+            d = _distance_to_segment(pos, head, tail)
             r = max(bone_len * envelope_factor, 1e-6)
             t = d / r
             weights.append(0.0 if t >= 1.0 else (1.0 - t * t) ** 2)
@@ -166,9 +170,9 @@ def _assign_bone_vertex_groups(
         total = sum(weights)
         if total < 1e-6:
             # Vertex outside all envelopes → assign fully to nearest bone
-            nearest = min(range(len(all_bones)),
+            nearest = min(range(len(bone_data)),
                           key=lambda i: _distance_to_segment(
-                              pos, Vector(all_bones[i].head), Vector(all_bones[i].tail)))
+                              pos, bone_data[i][0], bone_data[i][1]))
             vgs[nearest].add([vi], 1.0, 'REPLACE')
         else:
             for vg, w in zip(vgs, weights):
@@ -251,6 +255,11 @@ def _ribbon_from_chain(
         face_list.append((r0, r1, l1, l0))
 
 
+def _pos(levels: list[Vector], d: int) -> Vector:
+    """Return levels[d], clamping to the last entry when d is out of range."""
+    return levels[d] if d < len(levels) else levels[-1]
+
+
 def _interpolate_levels(
     levels_A: list[Vector],
     levels_B: list[Vector],
@@ -267,9 +276,6 @@ def _interpolate_levels(
         return []
 
     max_depth = max(len(levels_A), len(levels_B))
-
-    def _pos(levels: list[Vector], d: int) -> Vector:
-        return levels[d] if d < len(levels) else levels[-1]
 
     result: list[list[Vector]] = []
     for step in range(1, resolution):
@@ -367,9 +373,6 @@ def _cross_section_mesh(
     N = len(chains)
     all_levels = [_chain_levels(c, subdivisions) for c in chains]
     use_loop = close_loop and N >= 3
-
-    def _pos(levels, d):
-        return levels[d] if d < len(levels) else levels[-1]
 
     def _mid_col(LA, LB, depth):
         """Midpoint column between two level-lists, truncated to `depth`."""
