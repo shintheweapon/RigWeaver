@@ -410,9 +410,11 @@ class BONE_OT_generate_rig_from_mesh(Operator):
             mod = mesh_obj.modifiers.new(name="Armature", type='ARMATURE')
             mod.object = arm_obj
 
-        # ── 9. Restore selection ──────────────────────────────────────────────
+        # ── 9. Restore selection + deactivate preview ─────────────────────────
         context.view_layer.objects.active = arm_obj
         arm_obj.select_set(True)
+        if props.ui_rig_preview_active:
+            deactivate_rig_preview(props, context)
         bone_count = sum(len(c) for c in all_bone_name_chains)
         self.report(
             {'INFO'},
