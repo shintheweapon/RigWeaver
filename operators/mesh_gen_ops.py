@@ -313,21 +313,21 @@ def _fill_columns(
             if l_next and r_next:
                 face_list.append((
                     col_vert_map[(ci, d)],
-                    col_vert_map[(ci + 1, d)],
-                    col_vert_map[(ci + 1, d + 1)],
                     col_vert_map[(ci, d + 1)],
+                    col_vert_map[(ci + 1, d + 1)],
+                    col_vert_map[(ci + 1, d)],
                 ))
             elif l_next:
                 face_list.append((
                     col_vert_map[(ci, d)],
-                    col_vert_map[(ci + 1, d)],
                     col_vert_map[(ci, d + 1)],
+                    col_vert_map[(ci + 1, d)],
                 ))
             elif r_next:
                 face_list.append((
                     col_vert_map[(ci, d)],
-                    col_vert_map[(ci + 1, d)],
                     col_vert_map[(ci + 1, d + 1)],
+                    col_vert_map[(ci + 1, d)],
                 ))
 
 
