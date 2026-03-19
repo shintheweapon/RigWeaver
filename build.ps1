@@ -35,6 +35,7 @@ New-Item -ItemType Directory -Path $TempDir | Out-Null
 # Root files
 Copy-Item (Join-Path $ProjectRoot "__init__.py")           $TempDir
 Copy-Item (Join-Path $ProjectRoot "blender_manifest.toml") $TempDir
+Copy-Item (Join-Path $ProjectRoot "translations.py")       $TempDir
 
 # Subdirectories - copy only .py files (excludes __pycache__, *.pyc, etc.)
 foreach ($Dir in @("operators", "ui")) {
