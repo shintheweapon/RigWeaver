@@ -68,7 +68,8 @@ class VIEW3D_PT_rig_weaver(Panel):
                 box.prop(props, "connect_child_bones")
                 row = box.row()
                 row.scale_y = 1.3
-                row.operator("rig_weaver.extract_used_armature", icon='LINKED')
+                row.operator("rig_weaver.extract_used_armature",
+                             text=iface_("Extract Used Armature"), icon='LINKED')
 
         layout.separator()
 
@@ -139,7 +140,8 @@ class VIEW3D_PT_rig_weaver(Panel):
                 box.prop(props, "mesh_output_name")
                 row = box.row(align=True)
                 row.scale_y = 1.3
-                row.operator("rig_weaver.generate_mesh", icon='OUTLINER_OB_MESH')
+                row.operator("rig_weaver.generate_mesh",
+                             text=iface_("Generate Proxy Mesh"), icon='OUTLINER_OB_MESH')
                 row.operator("rig_weaver.update_mesh", text=iface_("Update Mesh"), icon='FILE_REFRESH')
 
 

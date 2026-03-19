@@ -174,7 +174,7 @@ class RigWeaverProperties(PropertyGroup):
             "Base name for generated mesh object(s). "
             "In Separate Objects mode this becomes a prefix: OutputName_BoneName"
         ),
-        default="BoneMesh",
+        default="proxy_mesh",
     )
     # JSON-serialised list of weighted bone names, cached between runs
     last_weighted_bones: StringProperty(default="[]")

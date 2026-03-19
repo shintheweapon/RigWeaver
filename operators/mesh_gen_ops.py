@@ -786,7 +786,7 @@ def _apply_post_processing(
 class BONE_OT_generate_mesh(Operator):
     """Generate a low-poly quad mesh from the selected pose bones"""
     bl_idname = "rig_weaver.generate_mesh"
-    bl_label = "Generate Bone Mesh"
+    bl_label = "Generate Proxy Mesh"
     bl_description = (
         "Create a surface mesh from the selected bone chains in Pose Mode. "
         "Single chain produces a ribbon; multiple chains produce a connected "
@@ -893,11 +893,11 @@ class BONE_OT_generate_mesh(Operator):
 
 
 class BONE_OT_update_mesh(Operator):
-    """Regenerate geometry of existing BoneMesh object(s) in-place, preserving modifiers"""
+    """Regenerate geometry of existing proxy mesh object(s) in-place, preserving modifiers"""
     bl_idname = "rig_weaver.update_mesh"
     bl_label = "Update Mesh"
     bl_description = (
-        "Regenerate geometry of existing BoneMesh object(s) from this armature "
+        "Regenerate geometry of existing proxy mesh object(s) from this armature "
         "using current settings and selected bones, preserving modifiers and transforms"
     )
     bl_options = {'REGISTER', 'UNDO'}

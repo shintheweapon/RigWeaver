@@ -30,7 +30,7 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     ("*", "Target"):                    "目标",
 
     # --- Operator labels ---
-    ("*", "Generate Bone Mesh"):        "生成骨骼网格",
+    ("*", "Generate Proxy Mesh"):        "生成代理网格",
     ("*", "Update Mesh"):               "更新网格",
     ("*", "Preview Weight Radius"):     "预览权重半径",
     ("*", "Toggle Vertex Group"):       "切换顶点组",
@@ -90,9 +90,9 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     "单条骨骼链生成带状网格，多条生成连接的横截面曲面，"
     "适合用作低面数模拟笼。",
 
-    ("*", "Regenerate geometry of existing BoneMesh object(s) from this armature "
+    ("*", "Regenerate geometry of existing proxy mesh object(s) from this armature "
           "using current settings and selected bones, preserving modifiers and transforms"):
-    "使用当前设置和选中骨骼重新生成此骨架对应的现有网格对象，"
+    "使用当前设置和选中骨骼重新生成此骨架对应的现有代理网格对象，"
     "保留修改器和变换。",
 
     ("*", "Toggle a wireframe overlay in the viewport showing the weight radius "
