@@ -130,6 +130,12 @@ class VIEW3D_PT_bone_util(Panel):
                 if props.mesh_auto_rig:
                     box.prop(props, "mesh_envelope_factor")
 
+                # Subdivision Surface
+                row = box.row(align=True)
+                row.prop(props, "mesh_add_subsurf", toggle=True)
+                if props.mesh_add_subsurf:
+                    row.prop(props, "mesh_subsurf_levels")
+
                 # Output name + action buttons
                 box.prop(props, "mesh_output_name")
                 row = box.row(align=True)

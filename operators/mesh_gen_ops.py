@@ -723,6 +723,32 @@ def _build_geometry(
     return all_verts, all_faces, all_uvs, chains_used
 
 
+def _apply_subsurf(obj: "bpy.types.Object", levels: int) -> None:
+    """
+    Add a Subdivision Surface modifier at the given level, or update the existing
+    one.  Always positioned before any Armature modifier in the stack so the
+    deformation order is Subsurf → Armature.
+    """
+    existing = next((m for m in obj.modifiers if m.type == 'SUBSURF'), None)
+    if existing:
+        existing.levels = levels
+        existing.render_levels = levels
+        mod = existing
+    else:
+        mod = obj.modifiers.new(name="Subdivision", type='SUBSURF')
+        mod.levels = levels
+        mod.render_levels = levels
+
+    # Move Subsurf before any Armature modifier
+    mod_names = [m.name for m in obj.modifiers]
+    mod_idx = mod_names.index(mod.name)
+    armature_idx = next(
+        (i for i, m in enumerate(obj.modifiers) if m.type == 'ARMATURE'), None
+    )
+    if armature_idx is not None and mod_idx > armature_idx:
+        obj.modifiers.move(mod_idx, armature_idx)
+
+
 def _apply_post_processing(
     obj: "bpy.types.Object",
     verts: list[Vector],
@@ -733,7 +759,9 @@ def _apply_post_processing(
     *,
     reuse_armature_mod: bool = False,
 ) -> None:
-    """Assign UVs and auto-rig (vertex groups + Armature modifier) to a mesh object."""
+    """Assign subdivision, UVs, and auto-rig to a mesh object."""
+    if props.mesh_add_subsurf:
+        _apply_subsurf(obj, props.mesh_subsurf_levels)
     if uvs:
         _assign_uvs(obj, uvs)
     if props.mesh_auto_rig:

@@ -148,6 +148,18 @@ class BoneUtilProperties(PropertyGroup):
         description="Create a UVMap layer on the generated mesh (U=lateral, V=longitudinal)",
         default=False,
     )
+    mesh_add_subsurf: BoolProperty(
+        name="Subdivision Surface",
+        description="Add a Subdivision Surface modifier to the generated mesh",
+        default=False,
+    )
+    mesh_subsurf_levels: IntProperty(
+        name="Levels",
+        description="Viewport subdivision levels (1 = light smooth, 2–3 = heavier)",
+        default=1,
+        min=1,
+        max=3,
+    )
     mesh_output_name: StringProperty(
         name="Output Name",
         description=(
