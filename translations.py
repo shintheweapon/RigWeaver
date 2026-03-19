@@ -80,25 +80,25 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     # -----------------------------------------------------------------------
     ("*", "Build a reduced armature from bones that actually deform meshes. "
           "Optionally retarget mesh Armature modifiers to the new armature."):
-        "从实际驱动网格变形的骨骼中构建精简骨架，"
-        "并可选择将网格的骨架修改器重定向至新骨架。",
+    "从实际驱动网格变形的骨骼中构建精简骨架，"
+    "并可选择将网格的骨架修改器重定向至新骨架。",
 
     ("*", "Create a surface mesh from the selected bone chains in Pose Mode. "
           "Single chain produces a ribbon; multiple chains produce a connected "
           "cross-section surface. Intended as a low-poly simulation cage."):
-        "在姿态模式下从选中的骨骼链生成曲面网格。"
-        "单条骨骼链生成带状网格，多条生成连接的横截面曲面，"
-        "适合用作低面数模拟笼。",
+    "在姿态模式下从选中的骨骼链生成曲面网格。"
+    "单条骨骼链生成带状网格，多条生成连接的横截面曲面，"
+    "适合用作低面数模拟笼。",
 
     ("*", "Regenerate geometry of existing BoneMesh object(s) from this armature "
           "using current settings and selected bones, preserving modifiers and transforms"):
-        "使用当前设置和选中骨骼重新生成此骨架对应的现有网格对象，"
-        "保留修改器和变换。",
+    "使用当前设置和选中骨骼重新生成此骨架对应的现有网格对象，"
+    "保留修改器和变换。",
 
     ("*", "Toggle a wireframe overlay in the viewport showing the weight radius "
           "used for bone weight assignment. Radius = bone length × Weight Radius"):
-        "在视图中切换线框叠加层，显示用于骨骼权重分配的权重半径。"
-        "半径 = 骨骼长度 × 权重半径",
+    "在视图中切换线框叠加层，显示用于骨骼权重分配的权重半径。"
+    "半径 = 骨骼长度 × 权重半径",
 
     ("*", "Toggle this vertex group in/out of the active selection set"):
         "切换此顶点组在当前选择集中的选中状态",
@@ -122,7 +122,7 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     ("*", "Recalculate bone rolls on the reduced armature so the local Z axis "
           "aligns with global +Z (same as FBX import 'Automatic Bone Orientation')"):
         "重新计算精简骨架上的骨骼滚动角，使局部Z轴与全局+Z对齐"
-        "（与FBX导入"自动骨骼朝向"一致）",
+        '（与FBX导入"自动骨骼朝向"一致）',
 
     ("*", "Snap every child bone's head to its parent's tail in the reduced "
           "armature, forming a continuous connected chain regardless of whether "
@@ -133,7 +133,7 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     ("*", "Create one mesh object per chain instead of merging all ribbons into "
           "a single object (only active when Individual Chains is on)"):
         "为每条骨骼链创建独立网格对象，而非合并为一个"
-        "（仅在"独立条带"模式下有效）",
+        '（仅在"独立条带"模式下有效）',
 
     ("*", "Convert all quad faces to triangles in the generated mesh"):
         "将生成网格中的所有四边面转换为三角面",
@@ -182,7 +182,7 @@ _ZH_HANS: dict[tuple[str, str], str] = {
 
     ("*", "Base name for generated mesh object(s). In Separate Objects mode "
           "this becomes a prefix: OutputName_BoneName"):
-        "生成网格对象的基础名称。在"分离对象"模式下用作前缀：输出名称_骨骼名称",
+        '生成网格对象的基础名称。在"分离对象"模式下用作前缀：输出名称_骨骼名称',
 
     ("*", "Whether the viewport envelope radius overlay is currently displayed"):
         "视图中权重半径叠加层当前是否显示",
