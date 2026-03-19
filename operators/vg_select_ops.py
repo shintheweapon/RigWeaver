@@ -87,6 +87,8 @@ def _compute_mix_weights(
         elif blend_mode == 'AVERAGE': result[v.index] = sum(ws) / len(ws)
         elif blend_mode == 'ADD':     result[v.index] = min(sum(ws), 1.0)
         elif blend_mode == 'MIN':     result[v.index] = min(ws)
+    # Clamp all results to the valid Blender weight range [0.0, 1.0]
+    result = {vi: max(0.0, min(1.0, w)) for vi, w in result.items()}
     return result
 
 
