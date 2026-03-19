@@ -313,21 +313,21 @@ def _fill_columns(
             if l_next and r_next:
                 face_list.append((
                     col_vert_map[(ci, d)],
-                    col_vert_map[(ci + 1, d)],
-                    col_vert_map[(ci + 1, d + 1)],
                     col_vert_map[(ci, d + 1)],
+                    col_vert_map[(ci + 1, d + 1)],
+                    col_vert_map[(ci + 1, d)],
                 ))
             elif l_next:
                 face_list.append((
                     col_vert_map[(ci, d)],
-                    col_vert_map[(ci + 1, d)],
                     col_vert_map[(ci, d + 1)],
+                    col_vert_map[(ci + 1, d)],
                 ))
             elif r_next:
                 face_list.append((
                     col_vert_map[(ci, d)],
-                    col_vert_map[(ci + 1, d)],
                     col_vert_map[(ci + 1, d + 1)],
+                    col_vert_map[(ci + 1, d)],
                 ))
 
 
@@ -454,8 +454,19 @@ def _bowyer_watson(pts2d: list[tuple[float, float]]) -> list[tuple[int, int, int
                 continue
             triangles.append([ei, ej, pi, c[0], c[1], c[2]])
 
-    return [(t[0], t[1], t[2]) for t in triangles
-            if not (super_idx & {t[0], t[1], t[2]})]
+    result = []
+    for t in triangles:
+        if super_idx & {t[0], t[1], t[2]}:
+            continue
+        i, j, k = t[0], t[1], t[2]
+        ax, ay = pts[i]
+        bx, by = pts[j]
+        cx, cy = pts[k]
+        # Signed area positive = CCW; swap i,j to enforce CCW winding
+        if (bx - ax) * (cy - ay) - (by - ay) * (cx - ax) < 0:
+            i, j = j, i
+        result.append((i, j, k))
+    return result
 
 
 def _alpha_filter(
@@ -585,6 +596,7 @@ def _create_mesh_object(
     """
     mesh = bpy.data.meshes.new(name)
     mesh.from_pydata([v.to_tuple() for v in verts], [], faces)
+    mesh.validate(verbose=False)
     mesh.update()
     obj = bpy.data.objects.new(name, mesh)
     for coll in source_obj.users_collection:
@@ -617,11 +629,101 @@ def _replace_mesh_data(
     old_mesh = obj.data
     new_mesh = bpy.data.meshes.new(old_mesh.name)
     new_mesh.from_pydata([v.to_tuple() for v in verts], [], faces)
+    new_mesh.validate(verbose=False)
     new_mesh.update()
     obj.data = new_mesh
     bpy.data.meshes.remove(old_mesh)
     # Clear vertex groups so auto-rig re-assignment starts from a clean slate
     obj.vertex_groups.clear()
+
+
+def _build_geometry(
+    props,
+    chains: list[list],
+) -> "tuple[list, list, list | None, list] | None":
+    """
+    Run the mode-switch geometry generation for combined-object modes.
+    Returns (verts, faces, uvs, chains_used), or None if no geometry produced.
+    Triangulation is applied when props.mesh_triangulate is set.
+    """
+    mode = props.mesh_mode
+    all_verts: list[Vector] = []
+    all_faces: list[tuple[int, ...]] = []
+    all_uvs: "list[tuple[float, float]] | None" = (
+        [] if props.mesh_generate_uvs else None
+    )
+    chains_used: list[list] = []
+
+    if mode == 'INDIVIDUAL':
+        for chain in chains:
+            _ribbon_from_chain(chain, props.mesh_ribbon_width,
+                               props.mesh_bone_subdivisions,
+                               all_verts, all_faces, all_uvs)
+        chains_used.extend(chains)
+
+    elif mode in ('SURFACE', 'SURFACE_LOOP', 'SURFACE_SPLIT'):
+        first_parent = chains[0][0].parent
+        common_parent = (
+            first_parent
+            if all(c[0].parent == first_parent for c in chains)
+            else None
+        )
+        sorted_chains = _sort_chains(chains, common_parent)
+        strips = (
+            _split_into_strips(sorted_chains, props.mesh_strip_gap_factor)
+            if mode == 'SURFACE_SPLIT'
+            else [sorted_chains]
+        )
+        loop = (mode == 'SURFACE_LOOP')
+        for strip in strips:
+            if len(strip) == 1:
+                _ribbon_from_chain(strip[0], props.mesh_ribbon_width,
+                                   props.mesh_bone_subdivisions,
+                                   all_verts, all_faces, all_uvs)
+            else:
+                _cross_section_mesh(
+                    strip, loop, props.mesh_panel_resolution,
+                    all_verts, all_faces,
+                    subdivisions=props.mesh_bone_subdivisions,
+                    uv_list=all_uvs,
+                )
+            chains_used.extend(strip)
+
+    elif mode == 'TREE':
+        _tree_surface_mesh(
+            chains, props.mesh_bone_subdivisions, props.mesh_tree_alpha_factor,
+            all_verts, all_faces, all_uvs,
+        )
+        chains_used.extend(chains)
+
+    if not all_faces:
+        return None
+
+    if props.mesh_triangulate:
+        all_faces = _triangulate_faces(all_faces)
+
+    return all_verts, all_faces, all_uvs, chains_used
+
+
+def _apply_post_processing(
+    obj: "bpy.types.Object",
+    verts: list[Vector],
+    uvs: "list[tuple[float, float]] | None",
+    chains_used: list[list],
+    props,
+    source_obj: "bpy.types.Object",
+    *,
+    reuse_armature_mod: bool = False,
+) -> None:
+    """Assign UVs and auto-rig (vertex groups + Armature modifier) to a mesh object."""
+    if uvs:
+        _assign_uvs(obj, uvs)
+    if props.mesh_auto_rig:
+        _assign_bone_vertex_groups(obj, verts, chains_used, props.mesh_envelope_factor)
+        if not reuse_armature_mod or not any(
+            m.type == 'ARMATURE' for m in obj.modifiers
+        ):
+            obj.modifiers.new(name="Armature", type='ARMATURE').object = source_obj
 
 
 class BONE_OT_generate_mesh(Operator):
@@ -670,11 +772,7 @@ class BONE_OT_generate_mesh(Operator):
             if props.mesh_triangulate:
                 faces = _triangulate_faces(faces)
             obj = _create_mesh_object("BoneMesh", verts, faces, source_obj, context)
-            if uvs:
-                _assign_uvs(obj, uvs)
-            if props.mesh_auto_rig:
-                _assign_bone_vertex_groups(obj, verts, chains, props.mesh_envelope_factor)
-                obj.modifiers.new(name="Armature", type='ARMATURE').object = source_obj
+            _apply_post_processing(obj, verts, uvs, chains, props, source_obj)
             bpy.ops.pose.select_all(action='DESELECT')
             context.view_layer.objects.active = obj
             obj.select_set(True)
@@ -698,11 +796,7 @@ class BONE_OT_generate_mesh(Operator):
                     obj = _create_mesh_object(
                         f"BoneMesh_{chain[0].name}", verts, faces, source_obj, context
                     )
-                    if uvs:
-                        _assign_uvs(obj, uvs)
-                    if props.mesh_auto_rig:
-                        _assign_bone_vertex_groups(obj, verts, [chain], props.mesh_envelope_factor)
-                        obj.modifiers.new(name="Armature", type='ARMATURE').object = source_obj
+                    _apply_post_processing(obj, verts, uvs, [chain], props, source_obj)
                     created.append(obj)
             if not created:
                 self.report({'ERROR'}, "RigProxy: No geometry could be generated.")
@@ -718,68 +812,14 @@ class BONE_OT_generate_mesh(Operator):
         # ------------------------------------------------------------------
         # All other modes → single combined object
         # ------------------------------------------------------------------
-        all_verts: list[Vector] = []
-        all_faces: list[tuple[int, ...]] = []
-        all_uvs: list[tuple[float, float]] | None = ([] if props.mesh_generate_uvs else None)
-        chains_used: list[list] = []
-
-        if mode == 'INDIVIDUAL':
-            for chain in chains:
-                _ribbon_from_chain(chain, props.mesh_ribbon_width,
-                                   props.mesh_bone_subdivisions, all_verts, all_faces, all_uvs)
-            chains_used.extend(chains)
-
-        elif mode in ('SURFACE', 'SURFACE_LOOP', 'SURFACE_SPLIT'):
-            first_parent = chains[0][0].parent
-            common_parent = (
-                first_parent
-                if all(c[0].parent == first_parent for c in chains)
-                else None
-            )
-            sorted_chains = _sort_chains(chains, common_parent)
-            strips = (
-                _split_into_strips(sorted_chains, props.mesh_strip_gap_factor)
-                if mode == 'SURFACE_SPLIT'
-                else [sorted_chains]
-            )
-            loop = (mode == 'SURFACE_LOOP')
-            for strip in strips:
-                if len(strip) == 1:
-                    _ribbon_from_chain(strip[0], props.mesh_ribbon_width,
-                                       props.mesh_bone_subdivisions, all_verts, all_faces, all_uvs)
-                else:
-                    _cross_section_mesh(
-                        strip, loop, props.mesh_panel_resolution,
-                        all_verts, all_faces,
-                        subdivisions=props.mesh_bone_subdivisions,
-                        uv_list=all_uvs,
-                    )
-                chains_used.extend(strip)
-
-        elif mode == 'TREE':
-            _tree_surface_mesh(
-                chains,
-                props.mesh_bone_subdivisions,
-                props.mesh_tree_alpha_factor,
-                all_verts,
-                all_faces,
-                all_uvs,
-            )
-            chains_used.extend(chains)
-
-        if not all_faces:
+        result = _build_geometry(props, chains)
+        if result is None:
             self.report({'ERROR'}, "RigProxy: No geometry could be generated.")
             return {'CANCELLED'}
-
-        if props.mesh_triangulate:
-            all_faces = _triangulate_faces(all_faces)
+        all_verts, all_faces, all_uvs, chains_used = result
 
         obj = _create_mesh_object("BoneMesh", all_verts, all_faces, source_obj, context)
-        if all_uvs:
-            _assign_uvs(obj, all_uvs)
-        if props.mesh_auto_rig:
-            _assign_bone_vertex_groups(obj, all_verts, chains_used, props.mesh_envelope_factor)
-            obj.modifiers.new(name="Armature", type='ARMATURE').object = source_obj
+        _apply_post_processing(obj, all_verts, all_uvs, chains_used, props, source_obj)
 
         bpy.ops.pose.select_all(action='DESELECT')
         context.view_layer.objects.active = obj
@@ -853,24 +893,14 @@ class BONE_OT_update_mesh(Operator):
                 existing = next((o for o in tagged if o.name == target_name), None)
                 if existing:
                     _replace_mesh_data(existing, verts, faces)
-                    if uvs:
-                        _assign_uvs(existing, uvs)
-                    if props.mesh_auto_rig:
-                        _assign_bone_vertex_groups(
-                            existing, verts, [chain], props.mesh_envelope_factor)
-                        if not any(m.type == 'ARMATURE' for m in existing.modifiers):
-                            existing.modifiers.new(
-                                "Armature", 'ARMATURE').object = source_obj
+                    _apply_post_processing(
+                        existing, verts, uvs, [chain], props, source_obj,
+                        reuse_armature_mod=True)
                     updated += 1
                 else:
                     obj = _create_mesh_object(
                         target_name, verts, faces, source_obj, context)
-                    if uvs:
-                        _assign_uvs(obj, uvs)
-                    if props.mesh_auto_rig:
-                        _assign_bone_vertex_groups(
-                            obj, verts, [chain], props.mesh_envelope_factor)
-                        obj.modifiers.new("Armature", 'ARMATURE').object = source_obj
+                    _apply_post_processing(obj, verts, uvs, [chain], props, source_obj)
                     created += 1
             self.report(
                 {'INFO'},
@@ -880,70 +910,17 @@ class BONE_OT_update_mesh(Operator):
         # ------------------------------------------------------------------
         # All other modes → update the first tagged object in-place
         # ------------------------------------------------------------------
-        all_verts: list[Vector] = []
-        all_faces: list[tuple[int, ...]] = []
-        all_uvs: list[tuple[float, float]] | None = (
-            [] if props.mesh_generate_uvs else None
-        )
-        chains_used: list[list] = []
-
-        if mode == 'INDIVIDUAL':
-            for chain in chains:
-                _ribbon_from_chain(chain, props.mesh_ribbon_width,
-                                   props.mesh_bone_subdivisions,
-                                   all_verts, all_faces, all_uvs)
-            chains_used.extend(chains)
-
-        elif mode in ('SURFACE', 'SURFACE_LOOP', 'SURFACE_SPLIT'):
-            first_parent = chains[0][0].parent
-            common_parent = (
-                first_parent
-                if all(c[0].parent == first_parent for c in chains)
-                else None
-            )
-            sorted_chains = _sort_chains(chains, common_parent)
-            strips = (
-                _split_into_strips(sorted_chains, props.mesh_strip_gap_factor)
-                if mode == 'SURFACE_SPLIT'
-                else [sorted_chains]
-            )
-            loop = (mode == 'SURFACE_LOOP')
-            for strip in strips:
-                if len(strip) == 1:
-                    _ribbon_from_chain(strip[0], props.mesh_ribbon_width,
-                                       props.mesh_bone_subdivisions,
-                                       all_verts, all_faces, all_uvs)
-                else:
-                    _cross_section_mesh(
-                        strip, loop, props.mesh_panel_resolution,
-                        all_verts, all_faces,
-                        subdivisions=props.mesh_bone_subdivisions,
-                        uv_list=all_uvs,
-                    )
-                chains_used.extend(strip)
-
-        elif mode == 'TREE':
-            _tree_surface_mesh(
-                chains, props.mesh_bone_subdivisions, props.mesh_tree_alpha_factor,
-                all_verts, all_faces, all_uvs,
-            )
-            chains_used.extend(chains)
-
-        if not all_faces:
+        result = _build_geometry(props, chains)
+        if result is None:
             self.report({'ERROR'}, "RigProxy: No geometry could be generated.")
             return {'CANCELLED'}
-        if props.mesh_triangulate:
-            all_faces = _triangulate_faces(all_faces)
+        all_verts, all_faces, all_uvs, chains_used = result
 
         target = tagged[0]
         _replace_mesh_data(target, all_verts, all_faces)
-        if all_uvs:
-            _assign_uvs(target, all_uvs)
-        if props.mesh_auto_rig:
-            _assign_bone_vertex_groups(
-                target, all_verts, chains_used, props.mesh_envelope_factor)
-            if not any(m.type == 'ARMATURE' for m in target.modifiers):
-                target.modifiers.new("Armature", 'ARMATURE').object = source_obj
+        _apply_post_processing(
+            target, all_verts, all_uvs, chains_used, props, source_obj,
+            reuse_armature_mod=True)
 
         bpy.ops.pose.select_all(action='DESELECT')
         context.view_layer.objects.active = target
