@@ -134,6 +134,11 @@ class BoneUtilProperties(PropertyGroup):
         ),
         default=False,
     )
+    mesh_generate_uvs: BoolProperty(
+        name="Generate UVs",
+        description="Create a UVMap layer on the generated mesh (U=lateral, V=longitudinal)",
+        default=False,
+    )
     # JSON-serialised list of weighted bone names, cached between runs
     last_weighted_bones: StringProperty(default="[]")
 

@@ -199,6 +199,7 @@ def _ribbon_from_chain(
     subdivisions: int,
     vert_list: list[Vector],
     face_list: list[tuple[int, ...]],
+    uv_list: list[tuple[float, float]] | None = None,
 ) -> None:
     """
     Build a flat quad-strip ribbon along a single bone chain.
@@ -221,9 +222,14 @@ def _ribbon_from_chain(
     last = chain[-1]
     cross_sections.append((Vector(last.tail), Vector(last.x_axis)))
 
-    for pos, x_axis in cross_sections:
+    n_sections = len(cross_sections)
+    for idx, (pos, x_axis) in enumerate(cross_sections):
+        v = idx / max(n_sections - 1, 1)
         vert_list.append(pos + x_axis * half)
         vert_list.append(pos - x_axis * half)
+        if uv_list is not None:
+            uv_list.append((1.0, v))  # right
+            uv_list.append((0.0, v))  # left
 
     n = len(cross_sections)
     for i in range(n - 1):
@@ -268,6 +274,7 @@ def _fill_columns(
     real_len_right: int,
     vert_list: list[Vector],
     face_list: list[tuple[int, ...]],
+    uv_list: list[tuple[float, float]] | None = None,
 ) -> None:
     """
     Build vertices and faces for a sequence of level-columns.
@@ -283,9 +290,12 @@ def _fill_columns(
     # Build local vertex map: (col_idx, depth) → index in vert_list
     col_vert_map: dict[tuple[int, int], int] = {}
     for ci, col in enumerate(all_columns):
+        u = ci / max(n_cols - 1, 1)
         for d, pos in enumerate(col):
             col_vert_map[(ci, d)] = len(vert_list)
             vert_list.append(pos)
+            if uv_list is not None:
+                uv_list.append((u, d / max(max_depth - 1, 1)))
 
     for ci in range(n_cols - 1):
         len_left  = len(all_columns[ci])
@@ -328,6 +338,7 @@ def _cross_section_mesh(
     vert_list: list[Vector],
     face_list: list[tuple[int, ...]],
     subdivisions: int = 1,
+    uv_list: list[tuple[float, float]] | None = None,
 ) -> None:
     """
     Build a connected cross-section mesh from multiple chains of any length.
@@ -376,7 +387,7 @@ def _cross_section_mesh(
         left_interp  = _interpolate_levels(left_col,   center_col, resolution)
         right_interp = _interpolate_levels(center_col, right_col,  resolution)
         all_columns  = [left_col] + left_interp + [center_col] + right_interp + [right_col]
-        _fill_columns(all_columns, len(chains[i]), len(chains[i]), vert_list, face_list)
+        _fill_columns(all_columns, len(chains[i]), len(chains[i]), vert_list, face_list, uv_list)
 
 
 # ---------------------------------------------------------------------------
@@ -474,6 +485,7 @@ def _tree_surface_mesh(
     alpha_factor: float,
     vert_list: list[Vector],
     face_list: list[tuple[int, ...]],
+    uv_list: list[tuple[float, float]] | None = None,
 ) -> None:
     """
     Sample-point Delaunay triangulation for irregular/branching chain layouts.
@@ -520,8 +532,18 @@ def _tree_surface_mesh(
     if not tris:
         return
 
+    if uv_list is not None:
+        xs2 = [p[0] for p in pts2d]
+        ys2 = [p[1] for p in pts2d]
+        u_min, u_range = min(xs2), (max(xs2) - min(xs2)) or 1.0
+        v_min, v_range = min(ys2), (max(ys2) - min(ys2)) or 1.0
+
     base = len(vert_list)
-    vert_list.extend(pts3d)
+    for i, pt in enumerate(pts3d):
+        vert_list.append(pt)
+        if uv_list is not None:
+            uv_list.append(((pts2d[i][0] - u_min) / u_range,
+                            (pts2d[i][1] - v_min) / v_range))
     for (i, j, k) in tris:
         face_list.append((base + i, base + j, base + k))
 
@@ -571,6 +593,16 @@ def _create_mesh_object(
     return obj
 
 
+def _assign_uvs(
+    mesh_obj: "bpy.types.Object",
+    uv_list: list[tuple[float, float]],
+) -> None:
+    """Assign per-vertex UV coordinates to a newly created mesh object."""
+    uv_layer = mesh_obj.data.uv_layers.new(name="UVMap")
+    for loop in mesh_obj.data.loops:
+        uv_layer.data[loop.index].uv = uv_list[loop.vertex_index]
+
+
 # ---------------------------------------------------------------------------
 # Operator
 # ---------------------------------------------------------------------------
@@ -612,14 +644,17 @@ class BONE_OT_generate_mesh(Operator):
         if len(chains) == 1:
             verts: list[Vector] = []
             faces: list[tuple[int, ...]] = []
+            uvs: list[tuple[float, float]] | None = ([] if props.mesh_generate_uvs else None)
             _ribbon_from_chain(chains[0], props.mesh_ribbon_width,
-                               props.mesh_bone_subdivisions, verts, faces)
+                               props.mesh_bone_subdivisions, verts, faces, uvs)
             if not faces:
                 self.report({'ERROR'}, "RigProxy: No geometry could be generated.")
                 return {'CANCELLED'}
             if props.mesh_triangulate:
                 faces = _triangulate_faces(faces)
             obj = _create_mesh_object("BoneMesh", verts, faces, source_obj, context)
+            if uvs:
+                _assign_uvs(obj, uvs)
             if props.mesh_auto_rig:
                 _assign_bone_vertex_groups(obj, verts, chains, props.mesh_envelope_factor)
                 obj.modifiers.new(name="Armature", type='ARMATURE').object = source_obj
@@ -637,14 +672,17 @@ class BONE_OT_generate_mesh(Operator):
             for chain in chains:
                 verts = []
                 faces = []
+                uvs = [] if props.mesh_generate_uvs else None
                 _ribbon_from_chain(chain, props.mesh_ribbon_width,
-                                   props.mesh_bone_subdivisions, verts, faces)
+                                   props.mesh_bone_subdivisions, verts, faces, uvs)
                 if props.mesh_triangulate:
                     faces = _triangulate_faces(faces)
                 if faces:
                     obj = _create_mesh_object(
                         f"BoneMesh_{chain[0].name}", verts, faces, source_obj, context
                     )
+                    if uvs:
+                        _assign_uvs(obj, uvs)
                     if props.mesh_auto_rig:
                         _assign_bone_vertex_groups(obj, verts, [chain], props.mesh_envelope_factor)
                         obj.modifiers.new(name="Armature", type='ARMATURE').object = source_obj
@@ -665,12 +703,13 @@ class BONE_OT_generate_mesh(Operator):
         # ------------------------------------------------------------------
         all_verts: list[Vector] = []
         all_faces: list[tuple[int, ...]] = []
+        all_uvs: list[tuple[float, float]] | None = ([] if props.mesh_generate_uvs else None)
         chains_used: list[list] = []
 
         if mode == 'INDIVIDUAL':
             for chain in chains:
                 _ribbon_from_chain(chain, props.mesh_ribbon_width,
-                                   props.mesh_bone_subdivisions, all_verts, all_faces)
+                                   props.mesh_bone_subdivisions, all_verts, all_faces, all_uvs)
             chains_used.extend(chains)
 
         elif mode in ('SURFACE', 'SURFACE_LOOP', 'SURFACE_SPLIT'):
@@ -690,12 +729,13 @@ class BONE_OT_generate_mesh(Operator):
             for strip in strips:
                 if len(strip) == 1:
                     _ribbon_from_chain(strip[0], props.mesh_ribbon_width,
-                                       props.mesh_bone_subdivisions, all_verts, all_faces)
+                                       props.mesh_bone_subdivisions, all_verts, all_faces, all_uvs)
                 else:
                     _cross_section_mesh(
                         strip, loop, props.mesh_panel_resolution,
                         all_verts, all_faces,
                         subdivisions=props.mesh_bone_subdivisions,
+                        uv_list=all_uvs,
                     )
                 chains_used.extend(strip)
 
@@ -706,6 +746,7 @@ class BONE_OT_generate_mesh(Operator):
                 props.mesh_tree_alpha_factor,
                 all_verts,
                 all_faces,
+                all_uvs,
             )
             chains_used.extend(chains)
 
@@ -717,6 +758,8 @@ class BONE_OT_generate_mesh(Operator):
             all_faces = _triangulate_faces(all_faces)
 
         obj = _create_mesh_object("BoneMesh", all_verts, all_faces, source_obj, context)
+        if all_uvs:
+            _assign_uvs(obj, all_uvs)
         if props.mesh_auto_rig:
             _assign_bone_vertex_groups(obj, all_verts, chains_used, props.mesh_envelope_factor)
             obj.modifiers.new(name="Armature", type='ARMATURE').object = source_obj

@@ -83,6 +83,7 @@ class VIEW3D_PT_bone_util(Panel):
             box.prop(props, "mesh_bone_subdivisions")
             box.prop(props, "mesh_ribbon_width")
             box.prop(props, "mesh_triangulate")
+            box.prop(props, "mesh_generate_uvs")
             box.prop(props, "mesh_auto_rig")
             if props.mesh_auto_rig:
                 box.prop(props, "mesh_envelope_factor")
