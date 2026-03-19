@@ -18,6 +18,14 @@ from bpy.types import Operator
 _PREVIEW_GROUP = "_RigProxy_Preview"
 
 
+def _load_selected(obj) -> set[str]:
+    """Return the checked group names from obj, or an empty set on corrupt data."""
+    try:
+        return set(json.loads(obj.vg_selected_groups))
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return set()
+
+
 # ---------------------------------------------------------------------------
 # Core selection helper
 # ---------------------------------------------------------------------------
@@ -30,7 +38,7 @@ def _apply_vg_selection(obj: bpy.types.Object) -> None:
     in the JSON set stored on obj.vg_selected_groups.
     Requires obj to be a MESH in EDIT mode.
     """
-    selected_names: set[str] = set(json.loads(obj.vg_selected_groups))
+    selected_names: set[str] = _load_selected(obj)
     selected_indices: set[int] = {
         obj.vertex_groups[n].index
         for n in selected_names
@@ -120,7 +128,7 @@ class BONE_OT_vg_toggle(Operator):
 
     def execute(self, context):
         obj = context.object
-        selected: set[str] = set(json.loads(obj.vg_selected_groups))
+        selected: set[str] = _load_selected(obj)
 
         if self.group_name in selected:
             selected.discard(self.group_name)
@@ -203,7 +211,7 @@ class BONE_OT_vg_preview_mix(Operator):
             obj.vg_mix_preview_active = False
         else:
             # --- Toggle ON: compute mix, enter Weight Paint -----------------
-            selected_names: set[str] = set(json.loads(obj.vg_selected_groups))
+            selected_names: set[str] = _load_selected(obj)
             if not selected_names:
                 self.report({'WARNING'}, "RigProxy: No groups checked.")
                 return {'CANCELLED'}
@@ -244,7 +252,7 @@ class BONE_OT_vg_mix_groups(Operator):
 
     def execute(self, context):
         obj = context.object
-        selected_names: set[str] = set(json.loads(obj.vg_selected_groups))
+        selected_names: set[str] = _load_selected(obj)
 
         if not selected_names:
             self.report({'WARNING'}, "RigProxy: No groups checked.")

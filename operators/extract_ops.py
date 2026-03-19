@@ -277,7 +277,9 @@ class BONE_OT_extract_used_armature(Operator):
         bpy.ops.object.select_all(action='DESELECT')
         source_obj.select_set(True)
         context.view_layer.objects.active = source_obj
-        bpy.ops.object.mode_set(mode='EDIT')
+        if 'FINISHED' not in bpy.ops.object.mode_set(mode='EDIT'):
+            self.report({'ERROR'}, "RigProxy: Could not enter Edit Mode on source armature.")
+            return {'CANCELLED'}
 
         source_edit_data: dict[str, dict] = {}
         for name in ordered:
@@ -293,7 +295,9 @@ class BONE_OT_extract_used_armature(Operator):
             except (KeyError, AttributeError):
                 pass
 
-        bpy.ops.object.mode_set(mode='OBJECT')
+        if 'FINISHED' not in bpy.ops.object.mode_set(mode='OBJECT'):
+            self.report({'ERROR'}, "RigProxy: Could not return to Object Mode after reading source armature.")
+            return {'CANCELLED'}
 
         # --- Create new armature object ---
         new_arm_data = bpy.data.armatures.new(f"{source_obj.data.name}_Reduced")
@@ -312,7 +316,9 @@ class BONE_OT_extract_used_armature(Operator):
         bpy.ops.object.select_all(action='DESELECT')
         new_obj.select_set(True)
         context.view_layer.objects.active = new_obj
-        bpy.ops.object.mode_set(mode='EDIT')
+        if 'FINISHED' not in bpy.ops.object.mode_set(mode='EDIT'):
+            self.report({'ERROR'}, "RigProxy: Could not enter Edit Mode on new armature.")
+            return {'CANCELLED'}
 
         new_bone_map: dict[str, bpy.types.EditBone] = {}
 
@@ -380,14 +386,16 @@ class BONE_OT_extract_used_armature(Operator):
                 bpy.ops.armature.calculate_roll(type='GLOBAL_POS_Z')
 
         # --- Return to Object Mode ---
-        bpy.ops.object.mode_set(mode='OBJECT')
+        if 'FINISHED' not in bpy.ops.object.mode_set(mode='OBJECT'):
+            self.report({'ERROR'}, "RigProxy: Could not return to Object Mode after building new armature.")
+            return {'CANCELLED'}
 
         bpy.ops.object.select_all(action='DESELECT')
         new_obj.select_set(True)
         context.view_layer.objects.active = new_obj
 
         bone_count = len(new_bone_map)
-        self.report({'INFO'}, f"Bone Util: Created '{new_obj.name}' with {bone_count} bone(s).")
+        self.report({'INFO'}, f"RigProxy: Created '{new_obj.name}' with {bone_count} bone(s).")
 
         # --- Retarget meshes ---
         if props.retarget_meshes:

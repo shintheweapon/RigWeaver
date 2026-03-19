@@ -11,10 +11,19 @@ for chains of unequal length.
 """
 from __future__ import annotations
 
+import math
+
 from mathutils import Matrix, Vector
 
 import bpy
 from bpy.types import Operator
+
+try:
+    import numpy as _np
+    _NUMPY_AVAILABLE = True
+except ImportError:
+    _np = None
+    _NUMPY_AVAILABLE = False
 
 
 # ---------------------------------------------------------------------------
@@ -40,7 +49,9 @@ def _build_chains(selected: set) -> list[list]:
     for start in chain_starts:
         chain: list = []
         cur = start
-        while cur in selected:
+        visited: set = set()
+        while cur in selected and cur not in visited:
+            visited.add(cur)
             chain.append(cur)
             sel_children = [c for c in cur.children if c in selected]
             cur = sel_children[0] if len(sel_children) == 1 else None
@@ -508,9 +519,6 @@ def _tree_surface_mesh(
        alpha_factor × median edge length.
     5. Emit to vert_list / face_list.
     """
-    import numpy as np
-    import math
-
     pts3d: list[Vector] = []
     for chain in chains:
         pts3d.extend(_chain_levels(chain, subdivisions))
@@ -518,10 +526,10 @@ def _tree_surface_mesh(
     if len(pts3d) < 3:
         return
 
-    arr = np.array([(v.x, v.y, v.z) for v in pts3d], dtype=float)
+    arr = _np.array([(v.x, v.y, v.z) for v in pts3d], dtype=float)
     centroid = arr.mean(axis=0)
     centered = arr - centroid
-    _, _, Vt = np.linalg.svd(centered, full_matrices=False)
+    _, _, Vt = _np.linalg.svd(centered, full_matrices=False)
     pts2d = [(float(row[0]), float(row[1])) for row in centered @ Vt[:2].T]
 
     tris = _bowyer_watson(pts2d)
@@ -748,6 +756,11 @@ class BONE_OT_generate_mesh(Operator):
 
     def execute(self, context):
         props = context.scene.bone_util_props
+
+        if props.mesh_mode == 'TREE' and not _NUMPY_AVAILABLE:
+            self.report({'ERROR'}, "RigProxy: TREE mode requires NumPy — not available in this Blender build.")
+            return {'CANCELLED'}
+
         selected = set(context.selected_pose_bones)
         chains = _build_chains(selected)
         if not chains:
@@ -858,6 +871,11 @@ class BONE_OT_update_mesh(Operator):
 
     def execute(self, context):
         props = context.scene.bone_util_props
+
+        if props.mesh_mode == 'TREE' and not _NUMPY_AVAILABLE:
+            self.report({'ERROR'}, "RigProxy: TREE mode requires NumPy — not available in this Blender build.")
+            return {'CANCELLED'}
+
         selected = set(context.selected_pose_bones)
         chains = _build_chains(selected)
         if not chains:
