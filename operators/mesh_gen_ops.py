@@ -15,6 +15,7 @@ import math
 
 from mathutils import Matrix, Vector
 
+import bmesh
 import bpy
 from bpy.types import Operator
 
@@ -616,6 +617,11 @@ def _create_mesh_object(
     mesh.from_pydata([v.to_tuple() for v in verts], [], faces)
     mesh.validate(verbose=False)
     mesh.update()
+    bm = bmesh.new()
+    bm.from_mesh(mesh)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(mesh)
+    bm.free()
     obj = bpy.data.objects.new(name, mesh)
     for coll in source_obj.users_collection:
         coll.objects.link(obj)
@@ -649,6 +655,11 @@ def _replace_mesh_data(
     new_mesh.from_pydata([v.to_tuple() for v in verts], [], faces)
     new_mesh.validate(verbose=False)
     new_mesh.update()
+    bm = bmesh.new()
+    bm.from_mesh(new_mesh)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(new_mesh)
+    bm.free()
     obj.data = new_mesh
     bpy.data.meshes.remove(old_mesh)
     # Clear vertex groups so auto-rig re-assignment starts from a clean slate
