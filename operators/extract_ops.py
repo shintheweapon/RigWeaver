@@ -21,6 +21,13 @@ from mathutils import Vector
 # Properties
 # ---------------------------------------------------------------------------
 
+def _on_auto_rig_update(self, context):
+    """Deactivate envelope preview when Auto-Rig is turned off."""
+    if not self.mesh_auto_rig and self.ui_envelope_preview_active:
+        from . import mesh_gen_ops
+        mesh_gen_ops.deactivate_envelope_preview(self, context)
+
+
 class RigWeaverProperties(PropertyGroup):
     retarget_meshes: BoolProperty(
         name="Retarget Meshes",
@@ -142,6 +149,7 @@ class RigWeaverProperties(PropertyGroup):
             "generated mesh immediately deform-ready."
         ),
         default=False,
+        update=_on_auto_rig_update,
     )
     mesh_generate_uvs: BoolProperty(
         name="Generate UVs",

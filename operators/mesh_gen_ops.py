@@ -1008,6 +1008,18 @@ class BONE_OT_update_mesh(Operator):
 _envelope_draw_handle = None  # module-level handle; one active per Blender session
 
 
+def deactivate_envelope_preview(props, context) -> None:
+    """Remove the envelope draw handler and clear the active flag."""
+    global _envelope_draw_handle
+    if _envelope_draw_handle is not None:
+        bpy.types.SpaceView3D.draw_handler_remove(_envelope_draw_handle, 'WINDOW')
+        _envelope_draw_handle = None
+    props.ui_envelope_preview_active = False
+    for area in context.screen.areas:
+        if area.type == 'VIEW_3D':
+            area.tag_redraw()
+
+
 def _draw_envelope_circles() -> None:
     """
     SpaceView3D POST_VIEW callback.
@@ -1084,10 +1096,7 @@ class BONE_OT_preview_envelope_weights(Operator):
         props = context.scene.rig_weaver_props
 
         if _envelope_draw_handle is not None:
-            bpy.types.SpaceView3D.draw_handler_remove(
-                _envelope_draw_handle, 'WINDOW')
-            _envelope_draw_handle = None
-            props.ui_envelope_preview_active = False
+            deactivate_envelope_preview(props, context)
         else:
             _envelope_draw_handle = bpy.types.SpaceView3D.draw_handler_add(
                 _draw_envelope_circles, (), 'WINDOW', 'POST_VIEW')
