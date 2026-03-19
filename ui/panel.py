@@ -5,6 +5,7 @@ Visible in the 3D Viewport sidebar when the active object is an armature.
 import json
 
 import bpy
+from bpy.app.translations import pgettext_iface as iface_
 from bpy.types import Panel
 
 
@@ -52,13 +53,13 @@ class VIEW3D_PT_rig_weaver(Panel):
             icon='TRIA_DOWN' if props.ui_expand_extract else 'TRIA_RIGHT',
             icon_only=True, emboss=False,
         )
-        row.label(text="Extract Used Armature", icon='ARMATURE_DATA')
+        row.label(text=iface_("Extract Used Armature"), icon='ARMATURE_DATA')
 
         if props.ui_expand_extract:
             if mode != 'OBJECT':
-                box.label(text="Requires Object Mode", icon='INFO')
+                box.label(text=iface_("Requires Object Mode"), icon='INFO')
                 box.operator(
-                    "object.mode_set", text="Enter Object Mode",
+                    "object.mode_set", text=iface_("Enter Object Mode"),
                     icon='OBJECT_DATA',
                 ).mode = 'OBJECT'
             else:
@@ -79,13 +80,13 @@ class VIEW3D_PT_rig_weaver(Panel):
             icon='TRIA_DOWN' if props.ui_expand_generate else 'TRIA_RIGHT',
             icon_only=True, emboss=False,
         )
-        row.label(text="Generate Mesh", icon='MESH_DATA')
+        row.label(text=iface_("Generate Mesh"), icon='MESH_DATA')
 
         if props.ui_expand_generate:
             if mode != 'POSE':
-                box.label(text="Requires Pose Mode", icon='INFO')
+                box.label(text=iface_("Requires Pose Mode"), icon='INFO')
                 box.operator(
-                    "object.mode_set", text="Enter Pose Mode",
+                    "object.mode_set", text=iface_("Enter Pose Mode"),
                     icon='POSE_HLT',
                 ).mode = 'POSE'
             else:
@@ -124,7 +125,7 @@ class VIEW3D_PT_rig_weaver(Panel):
                     preview_icon = 'HIDE_OFF' if props.ui_envelope_preview_active else 'HIDE_ON'
                     box.operator(
                         "rig_weaver.preview_envelope_weights",
-                        text="Preview Weight Radius",
+                        text=iface_("Preview Weight Radius"),
                         icon=preview_icon,
                     )
 
@@ -139,7 +140,7 @@ class VIEW3D_PT_rig_weaver(Panel):
                 row = box.row(align=True)
                 row.scale_y = 1.3
                 row.operator("rig_weaver.generate_mesh", icon='OUTLINER_OB_MESH')
-                row.operator("rig_weaver.update_mesh", text="Update", icon='FILE_REFRESH')
+                row.operator("rig_weaver.update_mesh", text=iface_("Update Mesh"), icon='FILE_REFRESH')
 
 
 class VIEW3D_PT_vg_select(Panel):
@@ -162,29 +163,29 @@ class VIEW3D_PT_vg_select(Panel):
 
         # ── Weight Paint mode: preview is active ───────────────────────────
         if obj.mode == 'WEIGHT_PAINT':
-            layout.label(text="Previewing mixed weights", icon='HIDE_OFF')
+            layout.label(text=iface_("Previewing mixed weights"), icon='HIDE_OFF')
             layout.operator(
                 "rig_weaver.vg_preview_mix",
-                text="Exit Preview",
+                text=iface_("Exit Preview"),
                 icon='LOOP_BACK',
             )
             layout.separator()
             layout.operator(
                 "rig_weaver.vg_mix_groups",
-                text="Mix into Group",
+                text=iface_("Mix into Group"),
                 icon='AUTOMERGE_ON',
             )
             return
 
         # ── Edit Mode ──────────────────────────────────────────────────────
         if not obj.vertex_groups:
-            layout.label(text="No vertex groups", icon='INFO')
+            layout.label(text=iface_("No vertex groups"), icon='INFO')
             return
 
         # All / None bulk buttons.
         row = layout.row(align=True)
-        row.operator("rig_weaver.vg_select_all",  text="All")
-        row.operator("rig_weaver.vg_select_none", text="None")
+        row.operator("rig_weaver.vg_select_all",  text=iface_("All"))
+        row.operator("rig_weaver.vg_select_none", text=iface_("None"))
 
         # Scrollable group list (filter rendered inside list header by draw_filter).
         layout.template_list(
@@ -197,12 +198,12 @@ class VIEW3D_PT_vg_select(Panel):
         # ── Mix Checked Groups ─────────────────────────────────────────────
         layout.separator()
         box = layout.box()
-        box.label(text="Mix Checked Groups", icon='AUTOMERGE_ON')
+        box.label(text=iface_("Mix Checked Groups"), icon='AUTOMERGE_ON')
         box.prop(obj, "vg_mix_blend_mode")
         preview_icon = 'HIDE_OFF' if obj.vg_mix_preview_active else 'HIDE_ON'
         box.operator(
             "rig_weaver.vg_preview_mix",
-            text="Preview Mix",
+            text=iface_("Preview Mix"),
             icon=preview_icon,
         )
         box.prop_search(obj, "vg_mix_target_name", obj, "vertex_groups",
@@ -210,7 +211,7 @@ class VIEW3D_PT_vg_select(Panel):
         box.prop(obj, "vg_mix_remove_srcs")
         row = box.row()
         row.scale_y = 1.3
-        row.operator("rig_weaver.vg_mix_groups", text="Mix into Group",
+        row.operator("rig_weaver.vg_mix_groups", text=iface_("Mix into Group"),
                      icon='AUTOMERGE_ON')
 
 
