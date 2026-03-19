@@ -10,6 +10,7 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     ("*", "RigWeaver"):                 "RigWeaver",
     ("*", "Extract Used Armature"):     "提取使用中的骨架",
     ("*", "Generate Mesh"):             "生成网格",
+    ("*", "Generate Rig from Mesh"):    "从网格生成骨骼绑定",
     ("*", "Vertex Group Select"):       "顶点组选择",
 
     # --- Mode-gate buttons ---
@@ -30,10 +31,12 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     ("*", "Target"):                    "目标",
 
     # --- Operator labels ---
-    ("*", "Generate Proxy Mesh"):        "生成代理网格",
+    ("*", "Generate Proxy Mesh"):       "生成代理网格",
     ("*", "Update Mesh"):               "更新网格",
     ("*", "Preview Weight Radius"):     "预览权重半径",
     ("*", "Toggle Vertex Group"):       "切换顶点组",
+    ("*", "Generate Rig"):              "生成骨骼绑定",
+    ("*", "Generate Rig from Mesh"):    "从网格生成骨骼绑定",
 
     # --- Extract properties ---
     ("*", "Retarget Meshes"):           "重定向网格",
@@ -55,6 +58,13 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     ("*", "Generate UVs"):              "生成UV",
     ("*", "Subdivision Surface"):       "细分曲面",
     ("*", "Levels"):                    "级别",
+
+    # --- Rig from Mesh properties ---
+    ("*", "Chains"):                    "骨骼链数量",
+    ("*", "Bones per Chain"):           "每链骨骼数",
+    ("*", "Up Axis"):                   "朝上轴向",
+    ("*", "Assign Weights"):            "分配权重",
+    ("*", "Auto"):                      "自动",
 
     # --- VG select properties ---
     ("*", "Group Name"):                "组名",
@@ -224,6 +234,40 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     ("*", "Mean of all weights"):        "取所有权重的平均值",
     ("*", "Sum, clamped to 1.0"):        "权重叠加，上限为1.0",
     ("*", "Weakest weight wins"):        "取最小权重",
+
+    # -----------------------------------------------------------------------
+    # Tooltips — Generate Rig from Mesh
+    # -----------------------------------------------------------------------
+    ("*", "Generate a bone cage armature from the active mesh using cylindrical "
+          "decomposition. Bones radiate around the mesh's up axis from top to bottom."):
+        "使用圆柱分解法从当前激活网格生成骨骼笼骨架，"
+        "骨骼沿网格朝上轴向由顶到底辐射分布。",
+
+    ("*", "Number of radial bone chains distributed around the mesh"):
+        "围绕网格分布的放射状骨骼链数量",
+
+    ("*", "Number of bones per chain (height subdivisions from top to bottom)"):
+        "每条骨骼链的骨骼数量（由顶到底的高度细分数）",
+
+    ("*", "Axis that points from the bottom to the top of the garment. "
+          "AUTO detects the principal axis via PCA (requires NumPy)."):
+        "从服装底部指向顶部的轴向。"
+        "AUTO模式通过PCA自动检测主轴（需要NumPy）。",
+
+    ("*", "Create one vertex group per bone and add an Armature modifier "
+          "to the source mesh, making it immediately deform-ready."):
+        "为每块骨骼创建顶点组，并向源网格添加骨架修改器，使其可立即用于变形。",
+
+    ("*", "Radius of each bone's weight influence as a multiple of the bone's length. "
+          "Vertices outside all zones fall back to the nearest bone."):
+        "每块骨骼权重影响范围的半径，以骨骼长度的倍数表示。"
+        "超出所有范围的顶点将归属至最近骨骼。",
+
+    ("*", "Base name for the generated armature object and its bones"):
+        "生成骨架对象及其骨骼的基础名称",
+
+    ("*", "Detect automatically via PCA (requires NumPy)"):
+        "通过PCA自动检测（需要NumPy）",
 }
 
 # zh_HANS is the BCP-47 / CLDR tag; zh_CN is the legacy Blender locale name.

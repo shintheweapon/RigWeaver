@@ -145,6 +145,64 @@ class VIEW3D_PT_rig_weaver(Panel):
                 row.operator("rig_weaver.update_mesh", text=iface_("Update Mesh"), icon='FILE_REFRESH')
 
 
+class VIEW3D_PT_rig_from_mesh(Panel):
+    """RigWeaver — Generate a bone cage armature from the active mesh."""
+    bl_label      = "RigWeaver"
+    bl_idname     = "VIEW3D_PT_rig_from_mesh"
+    bl_space_type  = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category    = "RigWeaver"
+
+    @classmethod
+    def poll(cls, context):
+        return context.object is not None and context.object.type == 'MESH'
+
+    def draw(self, context):
+        layout = self.layout
+        props = context.scene.rig_weaver_props
+        obj = context.object
+
+        box = layout.box()
+        row = box.row()
+        row.prop(
+            props, "ui_expand_rig_from_mesh",
+            icon='TRIA_DOWN' if props.ui_expand_rig_from_mesh else 'TRIA_RIGHT',
+            icon_only=True, emboss=False,
+        )
+        row.label(text=iface_("Generate Rig from Mesh"), icon='ARMATURE_DATA')
+
+        if not props.ui_expand_rig_from_mesh:
+            return
+
+        if obj.mode != 'OBJECT':
+            box.label(text=iface_("Requires Object Mode"), icon='INFO')
+            box.operator(
+                "object.mode_set", text=iface_("Enter Object Mode"),
+                icon='OBJECT_DATA',
+            ).mode = 'OBJECT'
+            return
+
+        # Chain and bone count — compact two-column row
+        row = box.row(align=True)
+        row.prop(props, "rig_chains")
+        row.prop(props, "rig_bones_per_chain")
+
+        box.prop(props, "rig_up_axis")
+        box.prop(props, "rig_auto_weights")
+        if props.rig_auto_weights:
+            box.prop(props, "rig_envelope_factor")
+
+        box.prop(props, "rig_output_name")
+
+        row = box.row()
+        row.scale_y = 1.3
+        row.operator(
+            "rig_weaver.generate_rig_from_mesh",
+            text=iface_("Generate Rig"),
+            icon='ARMATURE_DATA',
+        )
+
+
 class VIEW3D_PT_vg_select(Panel):
     """RigWeaver — Vertex Group Multi-Select (active mesh in Edit Mode)."""
     bl_label      = "Vertex Group Select"
@@ -220,10 +278,12 @@ class VIEW3D_PT_vg_select(Panel):
 def register():
     bpy.utils.register_class(RIG_WEAVER_UL_vg_list)
     bpy.utils.register_class(VIEW3D_PT_rig_weaver)
+    bpy.utils.register_class(VIEW3D_PT_rig_from_mesh)
     bpy.utils.register_class(VIEW3D_PT_vg_select)
 
 
 def unregister():
     bpy.utils.unregister_class(VIEW3D_PT_vg_select)
+    bpy.utils.unregister_class(VIEW3D_PT_rig_from_mesh)
     bpy.utils.unregister_class(VIEW3D_PT_rig_weaver)
     bpy.utils.unregister_class(RIG_WEAVER_UL_vg_list)
