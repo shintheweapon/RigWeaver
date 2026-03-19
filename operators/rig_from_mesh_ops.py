@@ -25,9 +25,16 @@ except ImportError:
     _np = None
     _NUMPY_AVAILABLE = False
 
+try:
+    import gpu
+    from gpu_extras.batch import batch_for_shader
+    _GPU_AVAILABLE = True
+except ImportError:
+    _GPU_AVAILABLE = False
+
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Geometry helpers
 # ---------------------------------------------------------------------------
 
 _AXIS_VECTORS: dict[str, Vector] = {
@@ -114,9 +121,192 @@ def _fill_missing_levels(
     return levels  # type: ignore[return-value]  — all None entries are now filled
 
 
+def _compute_rig_bone_positions(
+    mesh_obj: "bpy.types.Object",
+    props,
+) -> "list[list[Vector]] | None":
+    """
+    Run the cylindrical decomposition for the given mesh and properties.
+
+    Returns a list of N_chains chains, each a list of N_bones+1 world-space
+    Vector positions ordered top→bottom (root first).  Returns None if the
+    mesh has too few vertices or AUTO axis is requested without NumPy.
+    """
+    if props.rig_up_axis == 'AUTO' and not _NUMPY_AVAILABLE:
+        return None
+
+    verts_world: list[Vector] = [
+        mesh_obj.matrix_world @ v.co for v in mesh_obj.data.vertices
+    ]
+    if len(verts_world) < 4:
+        return None
+
+    # Coordinate frame
+    up = _get_up_vector(verts_world, props.rig_up_axis)
+    centroid = sum(verts_world, Vector()) / len(verts_world)
+    right, forward = _perpendicular_axes(up)
+
+    # Cylindrical projection
+    thetas: list[float] = []
+    heights: list[float] = []
+    radii: list[float] = []
+    for v in verts_world:
+        rel = v - centroid
+        h = rel.dot(up)
+        proj = rel - up * h
+        r = proj.length
+        theta = math.atan2(proj.dot(forward), proj.dot(right)) if r > 1e-6 else 0.0
+        thetas.append(theta)
+        heights.append(h)
+        radii.append(r)
+
+    h_min = min(heights)
+    h_max = max(heights)
+    median_radius = sorted(radii)[len(radii) // 2]
+
+    # Bin vertices into (n_chains × n_levels) grid
+    n_chains = props.rig_chains
+    n_levels = props.rig_bones_per_chain + 1   # N bones require N+1 level positions
+    bins: list[list[list[Vector]]] = [
+        [[] for _ in range(n_levels)] for _ in range(n_chains)
+    ]
+    for v, theta, h in zip(verts_world, thetas, heights):
+        ci = int((theta + math.pi) / (2 * math.pi) * n_chains) % n_chains
+        if h_max > h_min:
+            li = min(
+                int((h - h_min) / (h_max - h_min) * n_levels),
+                n_levels - 1,
+            )
+        else:
+            li = 0
+        bins[ci][li].append(v)
+
+    # Bin centroids + fill empty bins, then reverse so root is at top
+    sector_angles = [
+        -math.pi + (ci + 0.5) * (2 * math.pi / n_chains)
+        for ci in range(n_chains)
+    ]
+    bone_levels: list[list[Vector]] = []
+    for ci in range(n_chains):
+        raw: list[Vector | None] = [
+            (sum(bins[ci][li], Vector()) / len(bins[ci][li])
+             if bins[ci][li] else None)
+            for li in range(n_levels)
+        ]
+        filled = _fill_missing_levels(
+            raw, h_min, h_max, up, centroid,
+            right, forward, sector_angles[ci], median_radius,
+        )
+        # Reverse so level[0] = h_max (waist/top) → root bone HEAD there
+        bone_levels.append(list(reversed(filled)))
+
+    return bone_levels
+
+
 # ---------------------------------------------------------------------------
-# Operator
+# Viewport preview
 # ---------------------------------------------------------------------------
+
+_rig_preview_handle = None   # SpaceView3D draw handler
+_rig_preview_lines: list[tuple] = []   # flat (head_xyz, tail_xyz) pairs
+
+
+def _update_rig_preview_cache(context) -> None:
+    """Recompute bone line pairs and tag all VIEW_3D areas for redraw."""
+    global _rig_preview_lines
+    obj = context.object
+    props = context.scene.rig_weaver_props
+
+    if obj is None or obj.type != 'MESH':
+        _rig_preview_lines = []
+    else:
+        bone_levels = _compute_rig_bone_positions(obj, props)
+        if bone_levels is None:
+            _rig_preview_lines = []
+        else:
+            lines = []
+            for chain in bone_levels:
+                for li in range(len(chain) - 1):
+                    lines.append((chain[li].to_tuple(), chain[li + 1].to_tuple()))
+            _rig_preview_lines = lines
+
+    for area in context.screen.areas:
+        if area.type == 'VIEW_3D':
+            area.tag_redraw()
+
+
+def _draw_rig_preview() -> None:
+    """SpaceView3D POST_VIEW callback — draws bone cage preview lines."""
+    if not _GPU_AVAILABLE or not _rig_preview_lines:
+        return
+
+    verts = []
+    for head, tail in _rig_preview_lines:
+        verts.append(head)
+        verts.append(tail)
+
+    shader = gpu.shader.from_builtin('UNIFORM_COLOR')
+    shader.bind()
+    shader.uniform_float("color", (0.2, 0.9, 0.4, 0.85))
+    gpu.state.blend_set('ALPHA')
+    gpu.state.line_width_set(2.0)
+    batch = batch_for_shader(shader, 'LINES', {"pos": verts})
+    batch.draw(shader)
+    gpu.state.blend_set('NONE')
+    gpu.state.line_width_set(1.0)
+
+
+def deactivate_rig_preview(props, context) -> None:
+    """Remove the rig preview draw handler and clear the active flag."""
+    global _rig_preview_handle
+    if _rig_preview_handle is not None:
+        bpy.types.SpaceView3D.draw_handler_remove(_rig_preview_handle, 'WINDOW')
+        _rig_preview_handle = None
+    props.ui_rig_preview_active = False
+    for area in context.screen.areas:
+        if area.type == 'VIEW_3D':
+            area.tag_redraw()
+
+
+# ---------------------------------------------------------------------------
+# Operators
+# ---------------------------------------------------------------------------
+
+class BONE_OT_preview_rig_from_mesh(Operator):
+    bl_idname = "rig_weaver.preview_rig_from_mesh"
+    bl_label = "Preview Rig"
+    bl_description = (
+        "Toggle a viewport overlay showing where the generated bones will be "
+        "placed. Updates live as Chains, Bones per Chain, and Up Axis change."
+    )
+    bl_options = {'REGISTER'}
+
+    @classmethod
+    def poll(cls, context):
+        return (
+            _GPU_AVAILABLE
+            and context.object is not None
+            and context.object.type == 'MESH'
+            and context.object.mode == 'OBJECT'
+        )
+
+    def execute(self, context):
+        global _rig_preview_handle
+        props = context.scene.rig_weaver_props
+
+        if _rig_preview_handle is not None:
+            deactivate_rig_preview(props, context)
+        else:
+            _update_rig_preview_cache(context)
+            _rig_preview_handle = bpy.types.SpaceView3D.draw_handler_add(
+                _draw_rig_preview, (), 'WINDOW', 'POST_VIEW',
+            )
+            props.ui_rig_preview_active = True
+            for area in context.screen.areas:
+                if area.type == 'VIEW_3D':
+                    area.tag_redraw()
+        return {'FINISHED'}
+
 
 class BONE_OT_generate_rig_from_mesh(Operator):
     bl_idname = "rig_weaver.generate_rig_from_mesh"
@@ -135,7 +325,8 @@ class BONE_OT_generate_rig_from_mesh(Operator):
 
     def execute(self, context):
         # ── NumPy guard ───────────────────────────────────────────────────────
-        if not _NUMPY_AVAILABLE and context.scene.rig_weaver_props.rig_up_axis == 'AUTO':
+        props = context.scene.rig_weaver_props
+        if not _NUMPY_AVAILABLE and props.rig_up_axis == 'AUTO':
             self.report(
                 {'ERROR'},
                 "RigWeaver: AUTO axis detection requires NumPy — "
@@ -144,78 +335,22 @@ class BONE_OT_generate_rig_from_mesh(Operator):
             return {'CANCELLED'}
 
         mesh_obj = context.object
-        props = context.scene.rig_weaver_props
 
-        # ── 1. World-space vertices ───────────────────────────────────────────
-        verts_world: list[Vector] = [
-            mesh_obj.matrix_world @ v.co for v in mesh_obj.data.vertices
-        ]
-        if len(verts_world) < 4:
+        # ── Steps 1–5: cylindrical decomposition ─────────────────────────────
+        bone_levels = _compute_rig_bone_positions(mesh_obj, props)
+        if bone_levels is None:
             self.report({'ERROR'}, "RigWeaver: Mesh has too few vertices.")
             return {'CANCELLED'}
 
-        # ── 2. Coordinate frame ───────────────────────────────────────────────
-        up = _get_up_vector(verts_world, props.rig_up_axis)
-        centroid = sum(verts_world, Vector()) / len(verts_world)
-        right, forward = _perpendicular_axes(up)
-
-        # ── 3. Cylindrical projection ─────────────────────────────────────────
-        thetas: list[float] = []
-        heights: list[float] = []
-        radii: list[float] = []
-        for v in verts_world:
-            rel = v - centroid
-            h = rel.dot(up)
-            proj = rel - up * h
-            r = proj.length
-            theta = math.atan2(proj.dot(forward), proj.dot(right)) if r > 1e-6 else 0.0
-            thetas.append(theta)
-            heights.append(h)
-            radii.append(r)
-
-        h_min = min(heights)
-        h_max = max(heights)
-        median_radius = sorted(radii)[len(radii) // 2]
-
-        # ── 4. Bin vertices into (n_chains × n_levels) grid ───────────────────
         n_chains = props.rig_chains
-        n_levels = props.rig_bones_per_chain + 1   # N bones require N+1 level positions
-        bins: list[list[list[Vector]]] = [
-            [[] for _ in range(n_levels)] for _ in range(n_chains)
-        ]
-        for v, theta, h in zip(verts_world, thetas, heights):
-            ci = int((theta + math.pi) / (2 * math.pi) * n_chains) % n_chains
-            if h_max > h_min:
-                li = min(
-                    int((h - h_min) / (h_max - h_min) * n_levels),
-                    n_levels - 1,
-                )
-            else:
-                li = 0
-            bins[ci][li].append(v)
+        n_levels = props.rig_bones_per_chain + 1
 
-        # ── 5. Bin centroids + fill empty bins ────────────────────────────────
-        # Pre-compute the representative angle of each sector's centre line
-        sector_angles = [
-            -math.pi + (ci + 0.5) * (2 * math.pi / n_chains)
-            for ci in range(n_chains)
+        # World-space verts needed later for weight assignment
+        verts_world: list[Vector] = [
+            mesh_obj.matrix_world @ v.co for v in mesh_obj.data.vertices
         ]
-        bone_levels: list[list[Vector]] = []
-        for ci in range(n_chains):
-            raw: list[Vector | None] = [
-                (sum(bins[ci][li], Vector()) / len(bins[ci][li])
-                 if bins[ci][li] else None)
-                for li in range(n_levels)
-            ]
-            filled = _fill_missing_levels(
-                raw, h_min, h_max, up, centroid,
-                right, forward, sector_angles[ci], median_radius,
-            )
-            bone_levels.append(filled)
 
         # ── 6. Create armature at world origin ────────────────────────────────
-        # Placing at origin means armature-local space == world space,
-        # which lets us set edit-bone positions directly from world coords.
         arm_data = bpy.data.armatures.new(props.rig_output_name)
         arm_obj = bpy.data.objects.new(props.rig_output_name, arm_data)
         arm_obj.location = Vector((0.0, 0.0, 0.0))
@@ -236,9 +371,7 @@ class BONE_OT_generate_rig_from_mesh(Operator):
         # ── 7. Create bones ───────────────────────────────────────────────────
         all_bone_name_chains: list[list[str]] = []
         for ci in range(n_chains):
-            # Reverse so level[0] = h_max (waist/top) → root bone HEAD there,
-            # and level[-1] = h_min (hem/bottom) → chain tips point downward.
-            levels = list(reversed(bone_levels[ci]))
+            levels = bone_levels[ci]   # already reversed (top → bottom)
             chain_names: list[str] = []
             prev_eb = None
             for li in range(n_levels - 1):
@@ -292,7 +425,7 @@ class BONE_OT_generate_rig_from_mesh(Operator):
 # Registration
 # ---------------------------------------------------------------------------
 
-classes = (BONE_OT_generate_rig_from_mesh,)
+classes = (BONE_OT_preview_rig_from_mesh, BONE_OT_generate_rig_from_mesh)
 
 
 def register():
@@ -301,5 +434,9 @@ def register():
 
 
 def unregister():
+    global _rig_preview_handle
+    if _rig_preview_handle is not None:
+        bpy.types.SpaceView3D.draw_handler_remove(_rig_preview_handle, 'WINDOW')
+        _rig_preview_handle = None
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)

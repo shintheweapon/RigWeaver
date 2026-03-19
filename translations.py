@@ -37,6 +37,7 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     ("*", "Toggle Vertex Group"):       "切换顶点组",
     ("*", "Generate Rig"):              "生成骨骼绑定",
     ("*", "Generate Rig from Mesh"):    "从网格生成骨骼绑定",
+    ("*", "Preview Rig"):               "预览骨骼绑定",
 
     # --- Extract properties ---
     ("*", "Retarget Meshes"):           "重定向网格",
@@ -238,6 +239,11 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     # -----------------------------------------------------------------------
     # Tooltips — Generate Rig from Mesh
     # -----------------------------------------------------------------------
+    ("*", "Toggle a viewport overlay showing where the generated bones will be "
+          "placed. Updates live as Chains, Bones per Chain, and Up Axis change."):
+        "切换视图叠加层，预览骨骼的生成位置。"
+        "调整骨骼链数量、每链骨骼数和朝上轴向时实时更新。",
+
     ("*", "Generate a bone cage armature from the active mesh using cylindrical "
           "decomposition. Bones radiate around the mesh's up axis from top to bottom."):
         "使用圆柱分解法从当前激活网格生成骨骼笼骨架，"

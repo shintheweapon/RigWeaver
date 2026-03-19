@@ -21,6 +21,13 @@ from mathutils import Vector
 # Properties
 # ---------------------------------------------------------------------------
 
+def _rig_prop_update(self, context):
+    """Recompute the rig preview cache when a geometry-affecting property changes."""
+    if self.ui_rig_preview_active:
+        from . import rig_from_mesh_ops
+        rig_from_mesh_ops._update_rig_preview_cache(context)
+
+
 def _on_auto_rig_update(self, context):
     """Deactivate envelope preview when Auto-Rig is turned off."""
     if not self.mesh_auto_rig and self.ui_envelope_preview_active:
@@ -197,6 +204,7 @@ class RigWeaverProperties(PropertyGroup):
         default=8,
         min=2,
         max=32,
+        update=_rig_prop_update,
     )
     rig_bones_per_chain: IntProperty(
         name="Bones per Chain",
@@ -204,6 +212,7 @@ class RigWeaverProperties(PropertyGroup):
         default=3,
         min=1,
         max=8,
+        update=_rig_prop_update,
     )
     rig_up_axis: EnumProperty(
         name="Up Axis",
@@ -221,6 +230,7 @@ class RigWeaverProperties(PropertyGroup):
             ('-Z',   "-Z",    "World -Z is up"),
         ],
         default='+Z',
+        update=_rig_prop_update,
     )
     rig_auto_weights: BoolProperty(
         name="Assign Weights",
@@ -248,6 +258,11 @@ class RigWeaverProperties(PropertyGroup):
     ui_expand_rig_from_mesh: BoolProperty(
         name="Generate Rig from Mesh",
         default=True,
+    )
+    ui_rig_preview_active: BoolProperty(
+        name="Rig Preview Active",
+        description="Whether the rig cage preview overlay is currently displayed",
+        default=False,
     )
 
 

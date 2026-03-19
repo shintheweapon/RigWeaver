@@ -194,6 +194,13 @@ class VIEW3D_PT_rig_from_mesh(Panel):
 
         box.prop(props, "rig_output_name")
 
+        preview_icon = 'HIDE_OFF' if props.ui_rig_preview_active else 'HIDE_ON'
+        box.operator(
+            "rig_weaver.preview_rig_from_mesh",
+            text=iface_("Preview Rig"),
+            icon=preview_icon,
+        )
+
         row = box.row()
         row.scale_y = 1.3
         row.operator(
