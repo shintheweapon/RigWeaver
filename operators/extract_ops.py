@@ -142,6 +142,10 @@ class BoneUtilProperties(PropertyGroup):
     # JSON-serialised list of weighted bone names, cached between runs
     last_weighted_bones: StringProperty(default="[]")
 
+    # UI state — collapsed/expanded section headers
+    ui_expand_extract: BoolProperty(name="Extract Used Armature", default=True)
+    ui_expand_generate: BoolProperty(name="Generate Mesh", default=True)
+
 
 # ---------------------------------------------------------------------------
 # Helpers
