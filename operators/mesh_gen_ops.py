@@ -19,6 +19,13 @@ import bpy
 from bpy.types import Operator
 
 try:
+    import gpu
+    from gpu_extras.batch import batch_for_shader
+    _GPU_AVAILABLE = True
+except ImportError:
+    _GPU_AVAILABLE = False
+
+try:
     import numpy as _np
     _NUMPY_AVAILABLE = True
 except ImportError:
@@ -954,10 +961,112 @@ class BONE_OT_update_mesh(Operator):
 
 
 # ---------------------------------------------------------------------------
+# Envelope preview — viewport draw overlay
+# ---------------------------------------------------------------------------
+
+_envelope_draw_handle = None  # module-level handle; one active per Blender session
+
+
+def _draw_envelope_circles() -> None:
+    """
+    SpaceView3D POST_VIEW callback.
+
+    Draws three orthogonal wire circles at each selected pose bone's head and
+    tail in world space.  Radius = bone_length × mesh_envelope_factor, matching
+    the weight calculation in _assign_bone_vertex_groups exactly.
+    """
+    if not _GPU_AVAILABLE:
+        return
+
+    context = bpy.context
+    obj = context.object
+    if obj is None or obj.type != 'ARMATURE' or obj.mode != 'POSE':
+        return
+
+    props = context.scene.bone_util_props
+    factor = props.mesh_envelope_factor
+    matrix = obj.matrix_world
+
+    shader = gpu.shader.from_builtin('UNIFORM_COLOR')
+    shader.bind()
+    shader.uniform_float("color", (0.9, 0.5, 0.1, 0.7))
+    gpu.state.blend_set('ALPHA')
+    gpu.state.line_width_set(1.5)
+
+    N = 32
+    angles = [2.0 * math.pi * i / N for i in range(N + 1)]
+
+    for pb in obj.pose.bones:
+        if not pb.bone.select:
+            continue
+        head_w = matrix @ pb.head
+        tail_w = matrix @ pb.tail
+        r = (tail_w - head_w).length * factor
+        if r < 1e-6:
+            continue
+
+        for center in (head_w, tail_w):
+            for ax0, ax1 in ((0, 1), (1, 2), (0, 2)):
+                verts = []
+                for a in angles:
+                    v = [0.0, 0.0, 0.0]
+                    v[ax0] = math.cos(a) * r
+                    v[ax1] = math.sin(a) * r
+                    verts.append((center[0] + v[0],
+                                  center[1] + v[1],
+                                  center[2] + v[2]))
+                batch = batch_for_shader(shader, 'LINE_STRIP', {"pos": verts})
+                batch.draw(shader)
+
+    gpu.state.blend_set('NONE')
+    gpu.state.line_width_set(1.0)
+
+
+class BONE_OT_preview_envelope_weights(Operator):
+    bl_idname = "bone_util.preview_envelope_weights"
+    bl_label = "Preview Envelope"
+    bl_description = (
+        "Toggle a wireframe overlay in the viewport showing the envelope radius "
+        "used for bone weight assignment. Radius = bone length × Envelope Size"
+    )
+    bl_options = {'REGISTER'}
+
+    @classmethod
+    def poll(cls, context):
+        if not _GPU_AVAILABLE:
+            return False
+        return (context.object is not None
+                and context.object.type == 'ARMATURE')
+
+    def execute(self, context):
+        global _envelope_draw_handle
+        props = context.scene.bone_util_props
+
+        if _envelope_draw_handle is not None:
+            bpy.types.SpaceView3D.draw_handler_remove(
+                _envelope_draw_handle, 'WINDOW')
+            _envelope_draw_handle = None
+            props.ui_envelope_preview_active = False
+        else:
+            _envelope_draw_handle = bpy.types.SpaceView3D.draw_handler_add(
+                _draw_envelope_circles, (), 'WINDOW', 'POST_VIEW')
+            props.ui_envelope_preview_active = True
+
+        for area in context.screen.areas:
+            if area.type == 'VIEW_3D':
+                area.tag_redraw()
+        return {'FINISHED'}
+
+
+# ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
 
-classes = (BONE_OT_generate_mesh, BONE_OT_update_mesh)
+classes = (
+    BONE_OT_generate_mesh,
+    BONE_OT_update_mesh,
+    BONE_OT_preview_envelope_weights,
+)
 
 
 def register():
@@ -966,5 +1075,9 @@ def register():
 
 
 def unregister():
+    global _envelope_draw_handle
+    if _envelope_draw_handle is not None:
+        bpy.types.SpaceView3D.draw_handler_remove(_envelope_draw_handle, 'WINDOW')
+        _envelope_draw_handle = None
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)

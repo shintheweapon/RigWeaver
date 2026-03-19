@@ -146,6 +146,13 @@ class BoneUtilProperties(PropertyGroup):
     ui_expand_extract: BoolProperty(name="Extract Used Armature", default=True)
     ui_expand_generate: BoolProperty(name="Generate Mesh", default=True)
 
+    # UI state — envelope preview overlay active
+    ui_envelope_preview_active: BoolProperty(
+        name="Envelope Preview Active",
+        description="Whether the viewport envelope radius overlay is currently displayed",
+        default=False,
+    )
+
 
 # ---------------------------------------------------------------------------
 # Helpers
