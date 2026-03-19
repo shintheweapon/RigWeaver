@@ -63,7 +63,7 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     ("*", "Remove Source Groups"):      "删除源组",
 
     # --- mesh_mode enum ---
-    ("*", "Individual Strips"):         "独立带状",
+    ("*", "Individual Strips"):         "独立条带",
     ("*", "Connected Surface"):         "连接曲面",
     ("*", "Connected Loop"):            "封闭环形曲面",
     ("*", "Auto-Split Surface"):        "自动分割曲面",
@@ -74,6 +74,156 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     ("*", "Average"):                   "平均值",
     ("*", "Add"):                       "叠加",
     ("*", "Min"):                       "最小值",
+
+    # -----------------------------------------------------------------------
+    # Tooltips — operator bl_description
+    # -----------------------------------------------------------------------
+    ("*", "Build a reduced armature from bones that actually deform meshes. "
+          "Optionally retarget mesh Armature modifiers to the new armature."):
+        "从实际驱动网格变形的骨骼中构建精简骨架，"
+        "并可选择将网格的骨架修改器重定向至新骨架。",
+
+    ("*", "Create a surface mesh from the selected bone chains in Pose Mode. "
+          "Single chain produces a ribbon; multiple chains produce a connected "
+          "cross-section surface. Intended as a low-poly simulation cage."):
+        "在姿态模式下从选中的骨骼链生成曲面网格。"
+        "单条骨骼链生成带状网格，多条生成连接的横截面曲面，"
+        "适合用作低面数模拟笼。",
+
+    ("*", "Regenerate geometry of existing BoneMesh object(s) from this armature "
+          "using current settings and selected bones, preserving modifiers and transforms"):
+        "使用当前设置和选中骨骼重新生成此骨架对应的现有网格对象，"
+        "保留修改器和变换。",
+
+    ("*", "Toggle a wireframe overlay in the viewport showing the weight radius "
+          "used for bone weight assignment. Radius = bone length × Weight Radius"):
+        "在视图中切换线框叠加层，显示用于骨骼权重分配的权重半径。"
+        "半径 = 骨骼长度 × 权重半径",
+
+    ("*", "Toggle this vertex group in/out of the active selection set"):
+        "切换此顶点组在当前选择集中的选中状态",
+
+    ("*", "Select vertices in all vertex groups"):   "选中所有顶点组",
+    ("*", "Deselect all vertex groups"):             "取消选中所有顶点组",
+
+    ("*", "Toggle a live Weight Paint preview of the blended vertex group weights"):
+        "切换混合顶点组权重的实时权重绘制预览",
+
+    ("*", "Merge checked vertex groups into a single target group"):
+        "将已勾选的顶点组合并至单一目标组",
+
+    # -----------------------------------------------------------------------
+    # Tooltips — property descriptions
+    # -----------------------------------------------------------------------
+    ("*", "Update Armature modifiers on connected meshes to point to the new "
+          "reduced armature instead of the original"):
+        "更新关联网格上的骨架修改器，使其指向新的精简骨架而非原始骨架",
+
+    ("*", "Recalculate bone rolls on the reduced armature so the local Z axis "
+          "aligns with global +Z (same as FBX import 'Automatic Bone Orientation')"):
+        "重新计算精简骨架上的骨骼滚动角，使局部Z轴与全局+Z对齐"
+        "（与FBX导入"自动骨骼朝向"一致）",
+
+    ("*", "Snap every child bone's head to its parent's tail in the reduced "
+          "armature, forming a continuous connected chain regardless of whether "
+          "intermediate bones were skipped"):
+        "将精简骨架中每块子骨骼的头部吸附至父骨骼的尾部，"
+        "无论是否跳过了中间骨骼，均形成连续骨骼链",
+
+    ("*", "Create one mesh object per chain instead of merging all ribbons into "
+          "a single object (only active when Individual Chains is on)"):
+        "为每条骨骼链创建独立网格对象，而非合并为一个"
+        "（仅在"独立条带"模式下有效）",
+
+    ("*", "Convert all quad faces to triangles in the generated mesh"):
+        "将生成网格中的所有四边面转换为三角面",
+
+    ("*", "Quad columns per panel in the lateral direction (between adjacent "
+          "chains). 1 = single column."):
+        "每个面板横向（相邻骨骼链之间）的四边形列数，1 = 单列",
+
+    ("*", "Subdivisions per bone segment in the longitudinal direction (along "
+          "the chain). 1 = one row per bone, 2+ = interpolated rows within "
+          "each segment."):
+        "每段骨骼纵向（沿骨骼链方向）的细分数，"
+        "1 = 每段一行，2及以上 = 段内插值多行",
+
+    ("*", "Width of the ribbon mesh generated from a single bone chain"):
+        "单条骨骼链生成的带状网格宽度",
+
+    ("*", "A gap larger than this multiple of the median inter-chain distance "
+          "is treated as a strip boundary"):
+        "相邻骨骼链间距超过中位链间距的此倍数时，视为条带分界",
+
+    ("*", "Circumradius threshold as a multiple of the median edge length. "
+          "Higher values keep more triangles; lower values prune long bridging edges."):
+        "外接圆半径阈值，以中位边长的倍数表示。"
+        "值越大保留三角面越多，值越小则裁剪较长桥接边。",
+
+    ("*", "Radius of each bone's weight influence as a multiple of the bone's "
+          "length. Vertices outside all influence zones fall back to the nearest bone."):
+        "每块骨骼权重影响范围的半径，以骨骼长度的倍数表示。"
+        "超出所有影响范围的顶点将归属至最近骨骼。",
+
+    ("*", "Create one vertex group per bone (inverse-distance weights) and add "
+          "an Armature modifier pointing to the source armature, making the "
+          "generated mesh immediately deform-ready."):
+        "为每块骨骼创建顶点组（距离反比权重），并添加指向源骨架的骨架修改器，"
+        "使生成网格可立即用于变形。",
+
+    ("*", "Create a UVMap layer on the generated mesh (U=lateral, V=longitudinal)"):
+        "在生成网格上创建UV贴图层（U=横向，V=纵向）",
+
+    ("*", "Add a Subdivision Surface modifier to the generated mesh"):
+        "为生成网格添加细分曲面修改器",
+
+    ("*", "Viewport subdivision levels (1 = light smooth, 2–3 = heavier)"):
+        "视图细分级别（1 = 轻度平滑，2-3 = 较重）",
+
+    ("*", "Base name for generated mesh object(s). In Separate Objects mode "
+          "this becomes a prefix: OutputName_BoneName"):
+        "生成网格对象的基础名称。在"分离对象"模式下用作前缀：输出名称_骨骼名称",
+
+    ("*", "Whether the viewport envelope radius overlay is currently displayed"):
+        "视图中权重半径叠加层当前是否显示",
+
+    ("*", "Name of the vertex group to toggle"):    "要切换的顶点组名称",
+
+    ("*", "JSON list of vertex group names active in the RigWeaver selector"):
+        "RigWeaver选择器中激活的顶点组名称JSON列表",
+
+    ("*", "How to combine weights from multiple groups"): "多组权重的合并方式",
+    ("*", "Name for the new merged vertex group"):        "新合并顶点组的名称",
+
+    ("*", "Delete the checked source groups after mixing"):
+        "混合后删除已勾选的源顶点组",
+
+    ("*", "Whether the mix preview is currently displayed"): "混合预览当前是否显示",
+    ("*", "Active index for vertex group UIList"):           "顶点组列表的当前活跃索引",
+
+    # -----------------------------------------------------------------------
+    # Tooltips — enum item descriptions
+    # -----------------------------------------------------------------------
+    ("*", "One ribbon per chain (hair, fur, loose strands)"):
+        "每条骨骼链生成一条带状网格（适合发丝、毛发、散状链条）",
+
+    ("*", "Panels between sorted adjacent chains (flat panels, even chain spacing)"):
+        "在排列好的相邻骨骼链之间生成面板（适合平面结构、均匀间距）",
+
+    ("*", "Closed surface, last chain connects back to first (skirts, rings, cylinders)"):
+        "封闭曲面，末端骨骼链与首端相连（适合裙摆、环形、圆柱体）",
+
+    ("*", "Connected surface with automatic gap detection "
+          "(inner/outer loop layouts, box pleats)"):
+        "带自动间隙检测的连接曲面（适合内外双层布局、箱型褶皱）",
+
+    ("*", "Sample-point triangulation for branching or irregular layouts (capes, fans)"):
+        "基于采样点的三角剖分，适合分叉或不规则布局（披风、扇形）",
+
+    ("*", "Strongest weight wins"):      "取最大权重",
+    ("*", "Mean of all weights"):        "取所有权重的平均值",
+    ("*", "Sum, clamped to 1.0"):        "权重叠加，上限为1.0",
+    ("*", "Weakest weight wins"):        "取最小权重",
 }
 
 # zh_HANS is the BCP-47 / CLDR tag; zh_CN is the legacy Blender locale name.
