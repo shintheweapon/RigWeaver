@@ -87,9 +87,10 @@ class VIEW3D_PT_bone_util(Panel):
             box.prop(props, "mesh_auto_rig")
             if props.mesh_auto_rig:
                 box.prop(props, "mesh_envelope_factor")
-            row = box.row()
+            row = box.row(align=True)
             row.scale_y = 1.3
             row.operator("bone_util.generate_mesh", icon='OUTLINER_OB_MESH')
+            row.operator("bone_util.update_mesh", text="", icon='FILE_REFRESH')
 
 
 class VIEW3D_PT_vg_select(Panel):
