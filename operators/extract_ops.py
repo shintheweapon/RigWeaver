@@ -41,8 +41,9 @@ class BoneUtilProperties(PropertyGroup):
     connect_child_bones: BoolProperty(
         name="Connect Child Bones",
         description=(
-            "When non-weighted intermediate bones are skipped, snap each child "
-            "bone's head to its new parent's tail to form a continuous chain"
+            "Snap every child bone's head to its parent's tail in the reduced "
+            "armature, forming a continuous connected chain regardless of whether "
+            "intermediate bones were skipped"
         ),
         default=False,
     )
@@ -356,14 +357,15 @@ class BONE_OT_extract_used_armature(Operator):
             used_parent = _find_used_parent(name, parent_name_map, used_names)
             if used_parent and used_parent in new_bone_map:
                 new_eb.parent = new_bone_map[used_parent]
-                if used_parent == direct_parent:
-                    # No intermediates skipped — preserve the source flag exactly
-                    new_eb.use_connect = data['use_connect']
-                elif props.connect_child_bones:
-                    # Intermediates skipped and option on — snap head to parent tail
+                if props.connect_child_bones:
+                    # Force all children to connect to their parent, regardless of
+                    # whether intermediates were skipped or the source flag value
                     new_eb.use_connect = True
+                elif used_parent == direct_parent:
+                    # Option off, no intermediates skipped — preserve source flag
+                    new_eb.use_connect = data['use_connect']
                 else:
-                    # Intermediates skipped and option off — leave gap (default)
+                    # Option off, intermediates skipped — leave gap (default)
                     new_eb.use_connect = False
             else:
                 new_eb.use_connect = False
