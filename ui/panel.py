@@ -110,15 +110,24 @@ class VIEW3D_PT_rig_weaver(Panel):
 
                 # U/V resolution + interpolation controls (grouped by axis)
                 if mesh_mode not in ('INDIVIDUAL', 'TREE'):
-                    col = box.column()
-                    col.use_property_split = True
-                    col.prop(props, "mesh_bone_subdivisions")       # U Subdivisions (along chain)
-                    col.prop(props, "mesh_row_interpolation")       # U Interpolation (along chain)
-                    col.separator(factor=0.5)
-                    col.prop(props, "mesh_panel_resolution")        # V Columns (between chains)
-                    col.prop(props, "mesh_lateral_interpolation")   # V Interpolation (between chains)
+                    u_box = box.box()
+                    u_box.label(text=iface_("U (Along Chain)"))
+                    u_col = u_box.column()
+                    u_col.use_property_split = True
+                    u_col.use_property_decorate = False
+                    u_col.prop(props, "mesh_bone_subdivisions")
+                    u_col.prop(props, "mesh_row_interpolation")
+
+                    v_box = box.box()
+                    v_box.label(text=iface_("V (Between Chains)"))
+                    v_col = v_box.column()
+                    v_col.use_property_split = True
+                    v_col.use_property_decorate = False
+                    v_col.prop(props, "mesh_panel_resolution")
+                    v_col.prop(props, "mesh_lateral_interpolation")
                     if props.mesh_lateral_interpolation != 'LINEAR':
-                        col.prop(props, "mesh_lateral_cr_strength", slider=True)  # V Strength
+                        v_col.prop(
+                            props, "mesh_lateral_cr_strength", slider=True)
                 else:
                     box.prop(props, "mesh_bone_subdivisions")
 
@@ -157,16 +166,17 @@ class VIEW3D_PT_rig_weaver(Panel):
                 row.scale_y = 1.3
                 row.operator("rig_weaver.generate_mesh",
                              text=iface_("Generate Proxy Mesh"), icon='OUTLINER_OB_MESH')
-                row.operator("rig_weaver.update_mesh", text=iface_("Update Mesh"), icon='FILE_REFRESH')
+                row.operator("rig_weaver.update_mesh", text=iface_(
+                    "Update Mesh"), icon='FILE_REFRESH')
 
 
 class VIEW3D_PT_rig_from_mesh(Panel):
     """RigWeaver — Generate a bone cage armature from the active mesh."""
-    bl_label      = "RigWeaver"
-    bl_idname     = "VIEW3D_PT_rig_from_mesh"
-    bl_space_type  = 'VIEW_3D'
+    bl_label = "RigWeaver"
+    bl_idname = "VIEW3D_PT_rig_from_mesh"
+    bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category    = "RigWeaver"
+    bl_category = "RigWeaver"
 
     @classmethod
     def poll(cls, context):
@@ -245,11 +255,11 @@ class VIEW3D_PT_rig_from_mesh(Panel):
 
 class VIEW3D_PT_vg_select(Panel):
     """RigWeaver — Vertex Group Multi-Select (active mesh in Edit Mode)."""
-    bl_label      = "Vertex Group Select"
-    bl_idname     = "VIEW3D_PT_vg_select"
-    bl_space_type  = 'VIEW_3D'
+    bl_label = "Vertex Group Select"
+    bl_idname = "VIEW3D_PT_vg_select"
+    bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category    = "RigWeaver"
+    bl_category = "RigWeaver"
 
     @classmethod
     def poll(cls, context):
@@ -263,7 +273,8 @@ class VIEW3D_PT_vg_select(Panel):
 
         # ── Weight Paint mode: preview is active ───────────────────────────
         if obj.mode == 'WEIGHT_PAINT':
-            layout.label(text=iface_("Previewing mixed weights"), icon='HIDE_OFF')
+            layout.label(text=iface_(
+                "Previewing mixed weights"), icon='HIDE_OFF')
             layout.operator(
                 "rig_weaver.vg_preview_mix",
                 text=iface_("Exit Preview"),

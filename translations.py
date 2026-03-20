@@ -52,25 +52,27 @@ _ZH_HANS: dict[tuple[str, str], str] = {
 
     # --- Mesh gen properties ---
     ("*", "Mode"):                      "模式",
-    ("*", "V Columns (between chains)"): "V方向列数（骨骼链之间）",
-    ("*", "U Subdivisions (along chain)"): "U方向细分（沿骨骼链）",
-    ("*", "U Interpolation (along chain)"): "U方向插值（沿骨骼链）",
-    ("*", "V Interpolation (between chains)"): "V方向插值（骨骼链之间）",
+    ("*", "U (Along Chain)"):           "U（沿骨骼链）",
+    ("*", "V (Between Chains)"):        "V（骨骼链之间）",
+    ("*", "V Columns"):                 "V方向列数",
+    ("*", "U Subdivisions"):            "U方向细分",
+    ("*", "U Interpolation"):           "U方向插值",
+    ("*", "V Interpolation"):           "V方向插值",
     ("*", "Linear"):                    "线性",
     ("*", "Catmull-Rom"):               "Catmull-Rom 样条",
     ("*", "Natural Cubic"):             "自然三次样条",
     ("*", "Straight lines between bone midpoints along the chain"):
         "沿骨骼链在骨骼中点间直线插值",
     ("*", "Smooth spline through bone midpoints — removes angular kinks "
-         "where bones meet"):
+     "where bones meet"):
         "通过骨骼中点的平滑样条——消除骨骼连接处的折角",
     ("*", "Straight lines between adjacent chain columns — flat-sided panels"):
         "相邻骨骼链列之间的直线——平面面板",
     ("*", "C1 smooth spline through all chain positions — curved cross-section "
-         "silhouette with continuous tangents"):
+     "silhouette with continuous tangents"):
         "通过所有骨骼链位置的C1平滑样条——截面轮廓曲线，切线连续",
     ("*", "C2 smooth spline — curvature is also continuous at every chain; "
-         "the mathematically smoothest possible cross-section curve"):
+     "the mathematically smoothest possible cross-section curve"):
         "C2平滑样条——每个骨骼链处曲率也连续；数学上最平滑的截面曲线",
     ("*", "V Strength"):                "V方向强度",
     ("*", "Blend between straight (Linear) and curved (spline) surface profile. "
