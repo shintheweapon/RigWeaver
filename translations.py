@@ -54,6 +54,22 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     ("*", "Mode"):                      "模式",
     ("*", "Column Resolution"):         "列分辨率",
     ("*", "Row Resolution"):            "行分辨率",
+    ("*", "Row Interpolation"):         "行插值",
+    ("*", "Lateral Interpolation"):     "横向插值",
+    ("*", "Linear"):                    "线性",
+    ("*", "Catmull-Rom"):               "Catmull-Rom 样条",
+    ("*", "Cosine"):                    "余弦",
+    ("*", "Cubic"):                     "三次方",
+    ("*", "Straight lines between bone midpoints"):
+        "骨骼中点间直线插值",
+    ("*", "Smooth spline through bone midpoints — eliminates angular kinks at bone junctions"):
+        "通过骨骼中点的平滑样条——消除骨骼连接处的折角",
+    ("*", "Straight blend between adjacent chain columns"):
+        "相邻骨骼链列之间的直线混合",
+    ("*", "Sinusoidal ease-in/out — rounder cross-section silhouette"):
+        "正弦缓入/缓出——更圆滑的截面轮廓",
+    ("*", "Cubic smoothstep ease-in/out — stronger rounding than cosine"):
+        "三次平滑步进缓入/缓出——比余弦更强的圆化效果",
     ("*", "Ribbon Width"):              "带状宽度",
     ("*", "Gap Factor"):                "间隙系数",
     ("*", "Bridge Filter"):             "桥接过滤器",

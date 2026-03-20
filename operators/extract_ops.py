@@ -110,6 +110,33 @@ class RigWeaverProperties(PropertyGroup):
         min=1,
         max=16,
     )
+    mesh_row_interpolation: EnumProperty(
+        name="Row Interpolation",
+        description=(
+            "Interpolation method along each chain (longitudinal direction). "
+            "Has no effect when Row Resolution is 1."
+        ),
+        items=[
+            ('LINEAR',      "Linear",
+             "Straight lines between bone midpoints"),
+            ('CATMULL_ROM', "Catmull-Rom",
+             "Smooth spline through bone midpoints — eliminates angular kinks at bone junctions"),
+        ],
+        default='LINEAR',
+    )
+    mesh_lateral_interpolation: EnumProperty(
+        name="Lateral Interpolation",
+        description="Interpolation method across adjacent chains (lateral direction)",
+        items=[
+            ('LINEAR', "Linear",
+             "Straight blend between adjacent chain columns"),
+            ('COSINE', "Cosine",
+             "Sinusoidal ease-in/out — rounder cross-section silhouette"),
+            ('CUBIC',  "Cubic",
+             "Cubic smoothstep ease-in/out — stronger rounding than cosine"),
+        ],
+        default='LINEAR',
+    )
     mesh_ribbon_width: FloatProperty(
         name="Ribbon Width",
         description="Width of the ribbon mesh generated from a single bone chain",
