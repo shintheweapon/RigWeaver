@@ -8,6 +8,12 @@ import bpy
 from bpy.app.translations import pgettext_iface as iface_
 from bpy.types import Panel
 
+try:
+    import numpy as _np
+    _PANEL_NUMPY_OK = True
+except ImportError:
+    _PANEL_NUMPY_OK = False
+
 
 class RIG_WEAVER_UL_vg_list(bpy.types.UIList):
     """Scrollable vertex-group list with checkbox toggle buttons."""
@@ -119,6 +125,8 @@ class VIEW3D_PT_rig_weaver(Panel):
                 row.prop(props, "mesh_triangulate", toggle=True)
                 row.prop(props, "mesh_generate_uvs", toggle=True)
 
+                box.separator(factor=0.5)
+
                 # Rigging
                 box.prop(props, "mesh_auto_rig")
                 if props.mesh_auto_rig:
@@ -143,6 +151,89 @@ class VIEW3D_PT_rig_weaver(Panel):
                 row.operator("rig_weaver.generate_mesh",
                              text=iface_("Generate Proxy Mesh"), icon='OUTLINER_OB_MESH')
                 row.operator("rig_weaver.update_mesh", text=iface_("Update Mesh"), icon='FILE_REFRESH')
+
+
+class VIEW3D_PT_rig_from_mesh(Panel):
+    """RigWeaver — Generate a bone cage armature from the active mesh."""
+    bl_label      = "RigWeaver"
+    bl_idname     = "VIEW3D_PT_rig_from_mesh"
+    bl_space_type  = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category    = "RigWeaver"
+
+    @classmethod
+    def poll(cls, context):
+        return context.object is not None and context.object.type == 'MESH'
+
+    def draw(self, context):
+        layout = self.layout
+        props = context.scene.rig_weaver_props
+        obj = context.object
+
+        box = layout.box()
+        row = box.row()
+        row.prop(
+            props, "ui_expand_rig_from_mesh",
+            icon='TRIA_DOWN' if props.ui_expand_rig_from_mesh else 'TRIA_RIGHT',
+            icon_only=True, emboss=False,
+        )
+        row.label(text=iface_("Generate Rig from Mesh"), icon='ARMATURE_DATA')
+
+        if not props.ui_expand_rig_from_mesh:
+            return
+
+        if obj.mode != 'OBJECT':
+            box.label(text=iface_("Requires Object Mode"), icon='INFO')
+            box.operator(
+                "object.mode_set", text=iface_("Enter Object Mode"),
+                icon='OBJECT_DATA',
+            ).mode = 'OBJECT'
+            return
+
+        # ── Algorithm ──────────────────────────────────────────────────────
+        row = box.row(align=True)
+        row.prop(props, "rig_chains")
+        row.prop(props, "rig_bones_per_chain")
+
+        box.prop(props, "rig_up_axis")
+
+        if props.rig_up_axis == 'AUTO' and not _PANEL_NUMPY_OK:
+            row = box.row()
+            row.alert = True
+            row.label(text=iface_("AUTO requires NumPy"), icon='ERROR')
+
+        box.separator(factor=0.5)
+
+        # ── Source mesh ────────────────────────────────────────────────────
+        box.prop(props, "rig_auto_weights")
+        if props.rig_auto_weights:
+            box.prop(props, "rig_envelope_factor")
+        box.prop(props, "rig_set_parent")
+
+        box.separator(factor=0.5)
+
+        # ── Output + actions ───────────────────────────────────────────────
+        box.prop(props, "rig_output_name")
+
+        preview_icon = 'HIDE_OFF' if props.ui_rig_preview_active else 'HIDE_ON'
+        box.operator(
+            "rig_weaver.preview_rig_from_mesh",
+            text=iface_("Preview Rig"),
+            icon=preview_icon,
+        )
+
+        row = box.row(align=True)
+        row.scale_y = 1.3
+        row.operator(
+            "rig_weaver.generate_rig_from_mesh",
+            text=iface_("Generate Rig"),
+            icon='ARMATURE_DATA',
+        )
+        row.operator(
+            "rig_weaver.update_rig_from_mesh",
+            text=iface_("Update Rig"),
+            icon='FILE_REFRESH',
+        )
 
 
 class VIEW3D_PT_vg_select(Panel):
@@ -220,10 +311,12 @@ class VIEW3D_PT_vg_select(Panel):
 def register():
     bpy.utils.register_class(RIG_WEAVER_UL_vg_list)
     bpy.utils.register_class(VIEW3D_PT_rig_weaver)
+    bpy.utils.register_class(VIEW3D_PT_rig_from_mesh)
     bpy.utils.register_class(VIEW3D_PT_vg_select)
 
 
 def unregister():
     bpy.utils.unregister_class(VIEW3D_PT_vg_select)
+    bpy.utils.unregister_class(VIEW3D_PT_rig_from_mesh)
     bpy.utils.unregister_class(VIEW3D_PT_rig_weaver)
     bpy.utils.unregister_class(RIG_WEAVER_UL_vg_list)

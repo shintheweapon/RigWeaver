@@ -21,6 +21,13 @@ from mathutils import Vector
 # Properties
 # ---------------------------------------------------------------------------
 
+def _rig_prop_update(self, context):
+    """Recompute the rig preview cache when a geometry-affecting property changes."""
+    if self.ui_rig_preview_active:
+        from . import rig_from_mesh_ops
+        rig_from_mesh_ops._update_rig_preview_cache(context)
+
+
 def _on_auto_rig_update(self, context):
     """Deactivate envelope preview when Auto-Rig is turned off."""
     if not self.mesh_auto_rig and self.ui_envelope_preview_active:
@@ -187,6 +194,82 @@ class RigWeaverProperties(PropertyGroup):
     ui_envelope_preview_active: BoolProperty(
         name="Envelope Preview Active",
         description="Whether the viewport envelope radius overlay is currently displayed",
+        default=False,
+    )
+
+    # ── Generate Rig from Mesh ────────────────────────────────────────────────
+    rig_chains: IntProperty(
+        name="Chains",
+        description="Number of radial bone chains distributed around the mesh",
+        default=8,
+        min=2,
+        max=32,
+        update=_rig_prop_update,
+    )
+    rig_bones_per_chain: IntProperty(
+        name="Bones per Chain",
+        description="Number of bones per chain (height subdivisions from top to bottom)",
+        default=3,
+        min=1,
+        max=8,
+        update=_rig_prop_update,
+    )
+    rig_up_axis: EnumProperty(
+        name="Up Axis",
+        description=(
+            "Axis that points from the bottom to the top of the garment. "
+            "AUTO detects the principal axis via PCA (requires NumPy)."
+        ),
+        items=[
+            ('AUTO', "Auto",  "Detect automatically via PCA (requires NumPy)"),
+            ('+X',   "+X",    "World +X is up"),
+            ('-X',   "-X",    "World -X is up"),
+            ('+Y',   "+Y",    "World +Y is up"),
+            ('-Y',   "-Y",    "World -Y is up"),
+            ('+Z',   "+Z",    "World +Z is up"),
+            ('-Z',   "-Z",    "World -Z is up"),
+        ],
+        default='+Z',
+        update=_rig_prop_update,
+    )
+    rig_auto_weights: BoolProperty(
+        name="Assign Weights",
+        description=(
+            "Create one vertex group per bone and add an Armature modifier "
+            "to the source mesh, making it immediately deform-ready."
+        ),
+        default=True,
+    )
+    rig_envelope_factor: FloatProperty(
+        name="Weight Radius",
+        description=(
+            "Radius of each bone's weight influence as a multiple of the bone's length. "
+            "Vertices outside all zones fall back to the nearest bone."
+        ),
+        default=1.5,
+        min=0.1,
+        soft_max=5.0,
+    )
+    rig_output_name: StringProperty(
+        name="Output Name",
+        description="Base name for the generated armature object and its bones",
+        default="rig",
+    )
+    rig_set_parent: BoolProperty(
+        name="Set as Parent",
+        description=(
+            "Parent the mesh to the generated armature so it follows it in "
+            "the outliner hierarchy. World transform is preserved."
+        ),
+        default=False,
+    )
+    ui_expand_rig_from_mesh: BoolProperty(
+        name="Generate Rig from Mesh",
+        default=True,
+    )
+    ui_rig_preview_active: BoolProperty(
+        name="Rig Preview Active",
+        description="Whether the rig cage preview overlay is currently displayed",
         default=False,
     )
 
