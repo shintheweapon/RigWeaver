@@ -13,6 +13,7 @@ wants a cage armature that can drive a cloth simulation proxy.
 from __future__ import annotations
 
 import math
+from types import SimpleNamespace
 
 import bpy
 from bpy.app.handlers import persistent
@@ -410,10 +411,15 @@ class BONE_OT_generate_rig_from_mesh(Operator):
             return {'CANCELLED'}
 
         # ── 7. Create bones ───────────────────────────────────────────────────
+        # Build proxy objects alongside name lists so we never need to look up
+        # arm_obj.pose.bones after Edit Mode — that lookup is unreliable for
+        # freshly created armatures on some mesh topologies (e.g. cube).
         all_bone_name_chains: list[list[str]] = []
+        all_bone_proxy_chains: list[list] = []
         for ci in range(n_chains):
             levels = bone_levels[ci]   # already reversed (top → bottom)
             chain_names: list[str] = []
+            chain_proxies: list = []
             prev_eb = None
             for li in range(n_levels - 1):
                 bone_name = f"{props.rig_output_name}_{ci:02d}_{li:02d}"
@@ -425,8 +431,16 @@ class BONE_OT_generate_rig_from_mesh(Operator):
                     eb.use_connect = True
                 prev_eb = eb
                 chain_names.append(eb.name)
+                # Capture head/tail while still in Edit Mode (.copy() required —
+                # EditBone Vector references become invalid after mode switch).
+                chain_proxies.append(SimpleNamespace(
+                    name=eb.name,
+                    head=eb.head.copy(),
+                    tail=eb.tail.copy(),
+                ))
             if chain_names:
                 all_bone_name_chains.append(chain_names)
+                all_bone_proxy_chains.append(chain_proxies)
 
         if not all_bone_name_chains:
             bpy.ops.object.mode_set(mode='OBJECT')
@@ -437,19 +451,13 @@ class BONE_OT_generate_rig_from_mesh(Operator):
             self.report({'ERROR'}, "RigWeaver: Could not return to Object Mode.")
             return {'CANCELLED'}
 
-        # Ensure the depsgraph processes the new armature so pose.bones is populated.
-        context.view_layer.update()
-
         # ── 8. Auto-weights ───────────────────────────────────────────────────
-        # Armature is at world origin so pose_bone.head/.tail == world space.
+        # Use proxy chain data captured during Edit Mode — avoids any dependency
+        # on arm_obj.pose.bones which is unreliable for newly created armatures.
         if props.rig_auto_weights:
-            pose_chains = [
-                [arm_obj.pose.bones[name] for name in chain]
-                for chain in all_bone_name_chains
-            ]
             from . import mesh_gen_ops
             mesh_gen_ops._assign_bone_vertex_groups(
-                mesh_obj, verts_world, pose_chains, props.rig_envelope_factor,
+                mesh_obj, verts_world, all_bone_proxy_chains, props.rig_envelope_factor,
             )
             arm_mods = [m for m in mesh_obj.modifiers if m.type == 'ARMATURE']
             if arm_mods:
@@ -551,9 +559,11 @@ class BONE_OT_update_rig_from_mesh(Operator):
             arm_data.edit_bones.remove(eb)
 
         all_bone_name_chains: list[list[str]] = []
+        all_bone_proxy_chains: list[list] = []
         for ci in range(n_chains):
             levels = bone_levels[ci]
             chain_names: list[str] = []
+            chain_proxies: list = []
             prev_eb = None
             for li in range(n_levels - 1):
                 bone_name = f"{props.rig_output_name}_{ci:02d}_{li:02d}"
@@ -565,8 +575,14 @@ class BONE_OT_update_rig_from_mesh(Operator):
                     eb.use_connect = True
                 prev_eb = eb
                 chain_names.append(eb.name)
+                chain_proxies.append(SimpleNamespace(
+                    name=eb.name,
+                    head=eb.head.copy(),
+                    tail=eb.tail.copy(),
+                ))
             if chain_names:
                 all_bone_name_chains.append(chain_names)
+                all_bone_proxy_chains.append(chain_proxies)
 
         if not all_bone_name_chains:
             bpy.ops.object.mode_set(mode='OBJECT')
@@ -584,13 +600,9 @@ class BONE_OT_update_rig_from_mesh(Operator):
         # ── Re-assign weights if enabled ──────────────────────────────────────
         if props.rig_auto_weights:
             mesh_obj.vertex_groups.clear()
-            pose_chains = [
-                [arm_obj.pose.bones[name] for name in chain]
-                for chain in all_bone_name_chains
-            ]
             from . import mesh_gen_ops
             mesh_gen_ops._assign_bone_vertex_groups(
-                mesh_obj, verts_world, pose_chains, props.rig_envelope_factor,
+                mesh_obj, verts_world, all_bone_proxy_chains, props.rig_envelope_factor,
             )
             arm_mods = [m for m in mesh_obj.modifiers if m.type == 'ARMATURE']
             if arm_mods:
