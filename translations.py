@@ -52,10 +52,10 @@ _ZH_HANS: dict[tuple[str, str], str] = {
 
     # --- Mesh gen properties ---
     ("*", "Mode"):                      "模式",
-    ("*", "V Columns"):                 "V方向列数",
-    ("*", "U Subdivisions"):            "U方向细分数",
-    ("*", "U Interpolation"):           "U方向插值",
-    ("*", "V Interpolation"):           "V方向插值",
+    ("*", "V Columns (between chains)"): "V方向列数（骨骼链之间）",
+    ("*", "U Subdivisions (along chain)"): "U方向细分（沿骨骼链）",
+    ("*", "U Interpolation (along chain)"): "U方向插值（沿骨骼链）",
+    ("*", "V Interpolation (between chains)"): "V方向插值（骨骼链之间）",
     ("*", "Linear"):                    "线性",
     ("*", "Catmull-Rom"):               "Catmull-Rom 样条",
     ("*", "Natural Cubic"):             "自然三次样条",
@@ -73,9 +73,9 @@ _ZH_HANS: dict[tuple[str, str], str] = {
          "the mathematically smoothest possible cross-section curve"):
         "C2平滑样条——每个骨骼链处曲率也连续；数学上最平滑的截面曲线",
     ("*", "V Strength"):                "V方向强度",
-    ("*", "Blend between straight (Linear) and curved (spline) V interpolation. "
+    ("*", "Blend between straight (Linear) and curved (spline) surface profile. "
           "0 = fully straight, 1 = full spline curvature."):
-        "在直线（线性）与曲线（样条）V方向插值之间混合。0 = 完全直线，1 = 完整样条曲率。",
+        "在直线（线性）与曲线（样条）表面轮廓之间混合。0 = 完全直线，1 = 完整样条曲率。",
     ("*", "Ribbon Width"):              "带状宽度",
     ("*", "Gap Factor"):                "间隙系数",
     ("*", "Bridge Filter"):             "桥接过滤器",

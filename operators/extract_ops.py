@@ -91,21 +91,19 @@ class RigWeaverProperties(PropertyGroup):
         default=False,
     )
     mesh_panel_resolution: IntProperty(
-        name="V Columns",
+        name="V Columns (between chains)",
         description=(
-            "Number of quad columns per panel in the V direction "
-            "(across adjacent chains — defines the cross-section resolution). "
-            "1 = flat panel per chain, higher values produce a smoother profile."
+            "Number of quad columns per panel between adjacent chains (V direction). "
+            "1 = flat panel per chain, higher values produce a smoother curved profile."
         ),
         default=2,
         min=1,
         max=16,
     )
     mesh_bone_subdivisions: IntProperty(
-        name="U Subdivisions",
+        name="U Subdivisions (along chain)",
         description=(
-            "Number of subdivisions per bone segment in the U direction "
-            "(along each chain — adds rows between bone midpoints). "
+            "Number of subdivisions per bone segment along each chain (U direction). "
             "1 = one row per bone, 2+ = interpolated rows for smoother length curves."
         ),
         default=2,
@@ -113,9 +111,9 @@ class RigWeaverProperties(PropertyGroup):
         max=16,
     )
     mesh_row_interpolation: EnumProperty(
-        name="U Interpolation",
+        name="U Interpolation (along chain)",
         description=(
-            "Interpolation method in the U direction (along each chain). "
+            "Curve shape used between bone midpoints along each chain (U direction). "
             "Has no effect when U Subdivisions is 1."
         ),
         items=[
@@ -128,10 +126,10 @@ class RigWeaverProperties(PropertyGroup):
         default='LINEAR',
     )
     mesh_lateral_interpolation: EnumProperty(
-        name="V Interpolation",
+        name="V Interpolation (between chains)",
         description=(
-            "Interpolation method in the V direction (across adjacent chains — "
-            "controls the shape of the cross-section profile)."
+            "Curve shape used between adjacent chains (V direction — "
+            "controls the surface profile)."
         ),
         items=[
             ('LINEAR',        "Linear",
@@ -148,7 +146,7 @@ class RigWeaverProperties(PropertyGroup):
     mesh_lateral_cr_strength: FloatProperty(
         name="V Strength",
         description=(
-            "Blend between straight (Linear) and curved (spline) V interpolation. "
+            "Blend between straight (Linear) and curved (spline) surface profile. "
             "0 = fully straight, 1 = full spline curvature."
         ),
         default=1.0,
