@@ -128,18 +128,21 @@ class RigWeaverProperties(PropertyGroup):
         name="Lateral Interpolation",
         description="Interpolation method across adjacent chains (lateral direction)",
         items=[
-            ('LINEAR',      "Linear",
+            ('LINEAR',        "Linear",
              "Straight blend between adjacent chain columns"),
-            ('CATMULL_ROM', "Catmull-Rom",
-             "Smooth spline through chain positions — genuinely curves the cross-section "
-             "profile for rounder silhouettes"),
+            ('CATMULL_ROM',   "Catmull-Rom",
+             "C1-continuous global spline through chain positions — smooth tangents, "
+             "round cross-section silhouette"),
+            ('NATURAL_CUBIC', "Natural Cubic",
+             "C2-continuous spline — smoothest possible interpolating curve; "
+             "minimises bending energy for the roundest silhouette"),
         ],
         default='LINEAR',
     )
     mesh_lateral_cr_strength: FloatProperty(
-        name="Lateral Strength",
+        name="Smooth Strength",
         description=(
-            "How strongly the Catmull-Rom spline curves the cross-section. "
+            "How strongly the smooth spline curves the cross-section. "
             "0 = straight (same as Linear), 1 = full spline curvature."
         ),
         default=1.0,
