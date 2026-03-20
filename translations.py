@@ -310,3 +310,7 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     ("*", "Detect automatically via PCA (requires NumPy)"):
         "通过 PCA 自动检测（需要 NumPy）",
 }
+
+translations_dict = {
+    "zh_HANS": _ZH_HANS,
+}
