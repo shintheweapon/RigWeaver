@@ -32,6 +32,9 @@ _ZH_HANS: dict[tuple[str, str], str] = {
 
     # --- Operator labels ---
     ("*", "Generate Proxy Mesh"):       "生成代理网格",
+    ("*", "Preview Mesh"):              "预览网格",
+    ("*", "Preview"):                   "预览",
+    ("*", "Discard Preview"):           "丢弃预览",
     ("*", "Update Mesh"):               "更新网格",
     ("*", "Preview Envelop Weight Radius"):     "预览封套权重半径",
     ("*", "Toggle Vertex Group"):       "切换顶点组",

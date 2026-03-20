@@ -34,6 +34,7 @@ except ImportError:
     _np = None
     _NUMPY_AVAILABLE = False
 
+_PREVIEW_OBJ_NAME = "~RW_PREVIEW"
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -1450,6 +1451,113 @@ class BONE_OT_preview_envelope_weights(Operator):
         return {'FINISHED'}
 
 
+class BONE_OT_preview_proxy_mesh(Operator):
+    """Preview proxy mesh shape as wireframe — no rigging or modifiers applied"""
+    bl_idname = "rig_weaver.preview_proxy_mesh"
+    bl_label = "Preview Mesh"
+    bl_description = (
+        "Generate a wireframe preview of the proxy mesh shape. "
+        "No rigging or modifiers are applied. Adjust settings and preview again "
+        "to iterate, then click Generate Proxy Mesh to commit."
+    )
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        if context.object is None or context.object.type != 'ARMATURE':
+            return False
+        if context.mode != 'POSE' or not context.selected_pose_bones:
+            return False
+        try:
+            props = context.scene.rig_weaver_props
+            selected = set(context.selected_pose_bones)
+            message = _mesh_numpy_requirement_message(
+                props, len(_build_chains(selected)))
+            if message is not None and not _NUMPY_AVAILABLE:
+                return False
+        except AttributeError:
+            pass
+        return True
+
+    def execute(self, context):
+        props = context.scene.rig_weaver_props
+        selected = set(context.selected_pose_bones)
+        chains = _build_chains(selected)
+        if not chains:
+            self.report({'ERROR'}, "RigWeaver: No chains found in selection.")
+            return {'CANCELLED'}
+
+        message = _mesh_numpy_requirement_message(props, len(chains))
+        if message is not None and not _NUMPY_AVAILABLE:
+            self.report({'ERROR'}, message)
+            return {'CANCELLED'}
+
+        source_obj = context.object
+
+        # Build geometry — always a single combined object for the preview
+        if len(chains) == 1:
+            verts: list[Vector] = []
+            faces: list[tuple[int, ...]] = []
+            _ribbon_from_chain(chains[0], props.mesh_ribbon_width,
+                               props.mesh_bone_subdivisions, verts, faces, None)
+            if props.mesh_triangulate:
+                faces = _triangulate_faces(faces)
+        else:
+            result = _build_geometry(props, chains)
+            if result is None:
+                self.report(
+                    {'ERROR'}, "RigWeaver: No geometry could be generated.")
+                return {'CANCELLED'}
+            verts, faces, _, _ = result
+
+        if not faces:
+            self.report({'ERROR'}, "RigWeaver: No geometry could be generated.")
+            return {'CANCELLED'}
+
+        # Create or update the preview object in-place
+        existing = bpy.data.objects.get(_PREVIEW_OBJ_NAME)
+        if existing is not None and existing.type == 'MESH':
+            _replace_mesh_data(existing, verts, faces)
+            obj = existing
+        else:
+            obj = _create_mesh_object(
+                _PREVIEW_OBJ_NAME, verts, faces, source_obj, context)
+            obj["rig_weaver_preview"] = True
+
+        obj.display_type = 'WIRE'
+
+        bpy.ops.pose.select_all(action='DESELECT')
+        context.view_layer.objects.active = obj
+        obj.select_set(True)
+        self.report(
+            {'INFO'},
+            "RigWeaver: Preview updated — adjust settings and preview again, "
+            "or click Generate Proxy Mesh to commit."
+        )
+        return {'FINISHED'}
+
+
+class BONE_OT_discard_preview_mesh(Operator):
+    """Delete the wireframe preview mesh object"""
+    bl_idname = "rig_weaver.discard_preview_mesh"
+    bl_label = "Discard Preview"
+    bl_description = "Delete the wireframe preview mesh"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return bpy.data.objects.get(_PREVIEW_OBJ_NAME) is not None
+
+    def execute(self, context):
+        obj = bpy.data.objects.get(_PREVIEW_OBJ_NAME)
+        if obj is None:
+            return {'CANCELLED'}
+        mesh = obj.data
+        bpy.data.objects.remove(obj, do_unlink=True)
+        bpy.data.meshes.remove(mesh)
+        return {'FINISHED'}
+
+
 # ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
@@ -1458,6 +1566,8 @@ classes = (
     BONE_OT_generate_mesh,
     BONE_OT_update_mesh,
     BONE_OT_preview_envelope_weights,
+    BONE_OT_preview_proxy_mesh,
+    BONE_OT_discard_preview_mesh,
 )
 
 

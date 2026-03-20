@@ -164,10 +164,19 @@ class VIEW3D_PT_rig_weaver(Panel):
                 box.prop(props, "mesh_set_parent")
                 row = box.row(align=True)
                 row.scale_y = 1.3
+                row.operator("rig_weaver.preview_proxy_mesh",
+                             text=iface_("Preview"), icon='HIDE_OFF')
                 row.operator("rig_weaver.generate_mesh",
                              text=iface_("Generate Proxy Mesh"), icon='OUTLINER_OB_MESH')
                 row.operator("rig_weaver.update_mesh", text=iface_(
                     "Update Mesh"), icon='FILE_REFRESH')
+                if bpy.data.objects.get("~RW_PREVIEW"):
+                    discard_row = box.row()
+                    discard_row.alert = True
+                    discard_row.operator(
+                        "rig_weaver.discard_preview_mesh",
+                        text=iface_("Discard Preview"), icon='X',
+                    )
 
 
 class VIEW3D_PT_rig_from_mesh(Panel):
