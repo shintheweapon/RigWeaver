@@ -66,6 +66,9 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     ("*", "Smooth spline through bone midpoints — removes angular kinks "
      "where bones meet"):
         "通过骨骼中点的平滑样条——消除骨骼连接处的折角",
+    ("*", "C2 smooth spline through chain midpoints — curvature is also "
+     "continuous along the chain for the smoothest longitudinal profile"):
+        "通过骨骼链中点的C2平滑样条——沿链方向曲率也连续，提供最平滑的纵向轮廓",
     ("*", "Straight lines between adjacent chain columns — flat-sided panels"):
         "相邻骨骼链列之间的直线——平面面板",
     ("*", "C1 smooth spline through all chain positions — curved cross-section "
@@ -127,6 +130,9 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     "在姿态模式下从选中的骨骼链生成曲面网格。"
     "单条骨骼链生成带状网格，多条生成连接的横截面曲面，"
     "适合用作低面数模拟笼。",
+
+        ("*", "RigWeaver: Natural Cubic interpolation requires NumPy — not available in this Blender build."):
+        "RigWeaver：Natural Cubic 插值需要 NumPy，但当前 Blender 构建中不可用。",
 
     ("*", "Regenerate geometry of existing proxy mesh object(s) from this armature "
           "using current settings and selected bones, preserving modifiers and transforms"):

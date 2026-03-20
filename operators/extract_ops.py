@@ -122,6 +122,9 @@ class RigWeaverProperties(PropertyGroup):
             ('CATMULL_ROM', "Catmull-Rom",
              "Smooth spline through bone midpoints — removes angular kinks "
              "where bones meet"),
+            ('NATURAL_CUBIC', "Natural Cubic",
+             "C2 smooth spline through chain midpoints — curvature is also "
+             "continuous along the chain for the smoothest longitudinal profile"),
         ],
         default='LINEAR',
     )

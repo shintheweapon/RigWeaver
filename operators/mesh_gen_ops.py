@@ -296,13 +296,39 @@ def _nc_eval(
         p0, p1 = pts_np[s], pts_np[(s + 1) % N]
         m0, m1 = M_np[s],   M_np[(s + 1) % N]
     else:
-        s  = max(0, min(s, N - 2))
+        s = max(0, min(s, N - 2))
         p0, p1 = pts_np[s], pts_np[s + 1]
         m0, m1 = M_np[s],   M_np[s + 1]
     b = (p1 - p0) - (2.0 * m0 + m1) / 6.0
     c = m0 / 2.0
     d = (m1 - m0) / 6.0
     return p0 + b * lt + c * lt * lt + d * lt * lt * lt
+
+
+def _natural_cubic_levels(
+    base_levels: list[Vector],
+    subdivisions: int,
+) -> list[Vector]:
+    """Sample an open natural cubic spline through base_levels.
+
+    The spline is evaluated across each consecutive base-level pair with
+    `subdivisions` samples per segment, preserving the same output length as
+    the existing linear and Catmull-Rom paths in `_chain_levels()`.
+    """
+    if subdivisions <= 1 or len(base_levels) <= 1:
+        return base_levels
+
+    pts_np = _np.array([list(pos) for pos in base_levels], dtype=float)
+    M_np = _solve_nc_spline_M(pts_np, use_loop=False)
+
+    result = [base_levels[0]]
+    for i in range(len(base_levels) - 1):
+        for s in range(1, subdivisions + 1):
+            result.append(
+                Vector(_nc_eval(i + s / subdivisions,
+                       pts_np, M_np, use_loop=False))
+            )
+    return result
 
 
 def _chain_levels(
@@ -316,18 +342,21 @@ def _chain_levels(
     With subdivisions=1: N+2 levels for N bones — one extension before the
     first bone, one midpoint per bone, one extension after the last.
     With subdivisions>1: each segment is split into that many parts using the
-    chosen row_interp method (LINEAR or CATMULL_ROM).
-    Note: CATMULL_ROM is identical to LINEAR when subdivisions=1.
+    chosen row_interp method (LINEAR, CATMULL_ROM, or NATURAL_CUBIC).
+    Note: all methods collapse to the same base levels when subdivisions=1.
     """
-    v_first = Vector(chain[0].tail)  - Vector(chain[0].head)
-    v_last  = Vector(chain[-1].tail) - Vector(chain[-1].head)
-    ext_top    = Vector(chain[0].head)  - v_first * 0.5
-    ext_bottom = Vector(chain[-1].tail) + v_last  * 0.5
-    midpoints  = [(Vector(b.head) + Vector(b.tail)) * 0.5 for b in chain]
+    v_first = Vector(chain[0].tail) - Vector(chain[0].head)
+    v_last = Vector(chain[-1].tail) - Vector(chain[-1].head)
+    ext_top = Vector(chain[0].head) - v_first * 0.5
+    ext_bottom = Vector(chain[-1].tail) + v_last * 0.5
+    midpoints = [(Vector(b.head) + Vector(b.tail)) * 0.5 for b in chain]
     base_levels = [ext_top] + midpoints + [ext_bottom]
 
     if subdivisions <= 1:
         return base_levels
+
+    if row_interp == 'NATURAL_CUBIC':
+        return _natural_cubic_levels(base_levels, subdivisions)
 
     result = [base_levels[0]]
     n = len(base_levels)
@@ -339,7 +368,8 @@ def _chain_levels(
             p2 = base_levels[i + 1]
             p3 = base_levels[min(i + 2, n - 1)]
             for s in range(1, subdivisions + 1):
-                result.append(_catmull_rom_point(p0, p1, p2, p3, s / subdivisions))
+                result.append(_catmull_rom_point(
+                    p0, p1, p2, p3, s / subdivisions))
     else:  # LINEAR
         for i in range(n - 1):
             a, b = base_levels[i], base_levels[i + 1]
@@ -347,6 +377,34 @@ def _chain_levels(
                 result.append(a.lerp(b, s / subdivisions))
 
     return result
+
+
+def _mesh_numpy_requirement_message(props, chains_count: int | None = None) -> str | None:
+    """Return a user-facing NumPy requirement message for mesh generation.
+
+    Natural cubic interpolation is only relevant for multi-chain surface modes.
+    Single-chain ribbon generation and INDIVIDUAL mode do not need NumPy for
+    interpolation, even if a natural-cubic enum item is currently selected.
+    """
+    if props.mesh_mode == 'TREE':
+        return "RigWeaver: TREE mode requires NumPy — not available in this Blender build."
+
+    if props.mesh_mode not in ('SURFACE', 'SURFACE_LOOP', 'SURFACE_SPLIT'):
+        return None
+
+    if chains_count is not None and chains_count <= 1:
+        return None
+
+    if (
+        props.mesh_row_interpolation == 'NATURAL_CUBIC'
+        or props.mesh_lateral_interpolation == 'NATURAL_CUBIC'
+    ):
+        return (
+            "RigWeaver: Natural Cubic interpolation requires NumPy — "
+            "not available in this Blender build."
+        )
+
+    return None
 
 
 def _ribbon_from_chain(
@@ -369,9 +427,9 @@ def _ribbon_from_chain(
 
     cross_sections: list[tuple[Vector, Vector]] = []
     for bone in chain:
-        head_pos  = Vector(bone.head)
-        tail_pos  = Vector(bone.tail)
-        x_axis    = Vector(bone.x_axis)
+        head_pos = Vector(bone.head)
+        tail_pos = Vector(bone.tail)
+        x_axis = Vector(bone.x_axis)
         for s in range(subdivisions):
             t = s / subdivisions
             cross_sections.append((head_pos.lerp(tail_pos, t), x_axis))
@@ -452,7 +510,7 @@ def _fill_columns(
                 uv_list.append((u, d / max(max_depth - 1, 1)))
 
     for ci in range(n_cols - 1):
-        len_left  = len(all_columns[ci])
+        len_left = len(all_columns[ci])
         len_right = len(all_columns[ci + 1])
 
         for d in range(max_depth):
@@ -509,7 +567,8 @@ def _cross_section_mesh(
     close_loop:          connect last chain back to first (cylindrical surfaces, N≥3).
     resolution:          quad columns per panel in the lateral direction.
     subdivisions:        row subdivisions per bone segment in the longitudinal direction.
-    row_interp:          interpolation along each chain ('LINEAR' or 'CATMULL_ROM').
+    row_interp:          interpolation along each chain
+                         ('LINEAR', 'CATMULL_ROM', or 'NATURAL_CUBIC').
     lateral_interp:      interpolation across adjacent chains
                          ('LINEAR', 'CATMULL_ROM', or 'NATURAL_CUBIC').
     lateral_cr_strength: blend factor for smooth lateral modes (0=linear, 1=full spline).
@@ -548,7 +607,8 @@ def _cross_section_mesh(
         max_d = max(len(lv) for lv in all_levels)
         nc_data = []
         for d in range(max_d):
-            pts = _np.array([list(_pos(all_levels[k], d)) for k in range(N)], dtype=float)
+            pts = _np.array([list(_pos(all_levels[k], d))
+                            for k in range(N)], dtype=float)
             nc_data.append((pts, _solve_nc_spline_M(pts, use_loop)))
 
     def _nc_col_at(global_t: float, depth: int) -> "list[Vector]":
@@ -560,17 +620,20 @@ def _cross_section_mesh(
 
     for i in range(N):
         depth = len(all_levels[i])
-        center_col = all_levels[i][:depth]  # exact chain position — always a vertex
+        # exact chain position — always a vertex
+        center_col = all_levels[i][:depth]
 
         if lateral_interp == 'CATMULL_ROM':
             # Model chain index as the global spline parameter (chain i → t=i).
             # Each panel spans t ∈ [i-0.5, i+0.5].  Sample the global Catmull-Rom
             # through all N chain columns at the correct parameter values so that
             # panel boundaries lie on the smooth spline, not on chord midpoints.
-            sm_left      = _cr_col(all_levels, N, i - 0.5,               depth, use_loop)
-            sm_right     = _cr_col(all_levels, N, i + 0.5,               depth, use_loop)
-            sm_left_int  = [_cr_col(all_levels, N, i - 0.5 + s / (2 * resolution), depth, use_loop)
-                            for s in range(1, resolution)]
+            sm_left = _cr_col(all_levels, N, i - 0.5,
+                              depth, use_loop)
+            sm_right = _cr_col(all_levels, N, i + 0.5,
+                               depth, use_loop)
+            sm_left_int = [_cr_col(all_levels, N, i - 0.5 + s / (2 * resolution), depth, use_loop)
+                           for s in range(1, resolution)]
             sm_right_int = [_cr_col(all_levels, N, i + s / (2 * resolution),       depth, use_loop)
                             for s in range(1, resolution)]
 
@@ -578,43 +641,49 @@ def _cross_section_mesh(
             # Same panel-parameter scheme as CATMULL_ROM, using the C2-continuous
             # natural cubic spline pre-solved above.  Chain i sits at t=i; panel
             # boundaries at t=i±0.5 lie on the smooth spline through all N chains.
-            sm_left      = _nc_col_at(i - 0.5,               depth)
-            sm_right     = _nc_col_at(i + 0.5,               depth)
-            sm_left_int  = [_nc_col_at(i - 0.5 + s / (2 * resolution), depth)
-                            for s in range(1, resolution)]
+            sm_left = _nc_col_at(i - 0.5,               depth)
+            sm_right = _nc_col_at(i + 0.5,               depth)
+            sm_left_int = [_nc_col_at(i - 0.5 + s / (2 * resolution), depth)
+                           for s in range(1, resolution)]
             sm_right_int = [_nc_col_at(i + s / (2 * resolution),        depth)
                             for s in range(1, resolution)]
 
         if lateral_interp in ('CATMULL_ROM', 'NATURAL_CUBIC'):
             if lateral_cr_strength >= 1.0:
-                left_col     = sm_left
-                right_col    = sm_right
-                left_interp  = sm_left_int
+                left_col = sm_left
+                right_col = sm_right
+                left_interp = sm_left_int
                 right_interp = sm_right_int
             else:
                 # Blend smooth spline toward linear boundaries for partial strength
-                lin_left  = _lin_boundary(i, 'left',  depth)
+                lin_left = _lin_boundary(i, 'left',  depth)
                 lin_right = _lin_boundary(i, 'right', depth)
-                lin_li    = _interpolate_levels(lin_left,  center_col, resolution)
-                lin_ri    = _interpolate_levels(center_col, lin_right, resolution)
+                lin_li = _interpolate_levels(lin_left,  center_col, resolution)
+                lin_ri = _interpolate_levels(center_col, lin_right, resolution)
                 t_inv = 1.0 - lateral_cr_strength
 
                 def _blend(sm, lin):
                     return [_pos(sm, d).lerp(_pos(lin, d), t_inv) for d in range(depth)]
 
-                left_col     = _blend(sm_left,  lin_left)
-                right_col    = _blend(sm_right, lin_right)
-                left_interp  = [_blend(c, l) for c, l in zip(sm_left_int,  lin_li)]
-                right_interp = [_blend(c, r) for c, r in zip(sm_right_int, lin_ri)]
+                left_col = _blend(sm_left,  lin_left)
+                right_col = _blend(sm_right, lin_right)
+                left_interp = [_blend(c, l)
+                               for c, l in zip(sm_left_int,  lin_li)]
+                right_interp = [_blend(c, r)
+                                for c, r in zip(sm_right_int, lin_ri)]
 
         else:  # LINEAR
-            left_col     = _lin_boundary(i, 'left',  depth)
-            right_col    = _lin_boundary(i, 'right', depth)
-            left_interp  = _interpolate_levels(left_col,   center_col, resolution)
-            right_interp = _interpolate_levels(center_col, right_col,  resolution)
+            left_col = _lin_boundary(i, 'left',  depth)
+            right_col = _lin_boundary(i, 'right', depth)
+            left_interp = _interpolate_levels(
+                left_col,   center_col, resolution)
+            right_interp = _interpolate_levels(
+                center_col, right_col,  resolution)
 
-        all_columns = [left_col] + left_interp + [center_col] + right_interp + [right_col]
-        _fill_columns(all_columns, len(chains[i]), len(chains[i]), vert_list, face_list, uv_list)
+        all_columns = [left_col] + left_interp + \
+            [center_col] + right_interp + [right_col]
+        _fill_columns(all_columns, len(chains[i]), len(
+            chains[i]), vert_list, face_list, uv_list)
 
 
 # ---------------------------------------------------------------------------
@@ -632,8 +701,10 @@ def _bowyer_watson(pts2d: list[tuple[float, float]]) -> list[tuple[int, int, int
         D = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
         if abs(D) < 1e-10:
             return None
-        ux = ((ax*ax + ay*ay)*(by - cy) + (bx*bx + by*by)*(cy - ay) + (cx*cx + cy*cy)*(ay - by)) / D
-        uy = ((ax*ax + ay*ay)*(cx - bx) + (bx*bx + by*by)*(ax - cx) + (cx*cx + cy*cy)*(bx - ax)) / D
+        ux = ((ax*ax + ay*ay)*(by - cy) + (bx*bx + by*by)
+              * (cy - ay) + (cx*cx + cy*cy)*(ay - by)) / D
+        uy = ((ax*ax + ay*ay)*(cx - bx) + (bx*bx + by*by)
+              * (ax - cx) + (cx*cx + cy*cy)*(bx - ax)) / D
         r2 = (ax - ux)**2 + (ay - uy)**2
         return ux, uy, r2
 
@@ -658,7 +729,8 @@ def _bowyer_watson(pts2d: list[tuple[float, float]]) -> list[tuple[int, int, int
     super_idx = {n, n + 1, n + 2}
 
     cc = _circumcircle(*pts[n], *pts[n + 1], *pts[n + 2])
-    triangles: list[list] = [[n, n + 1, n + 2, cc[0], cc[1], cc[2]]] if cc else []
+    triangles: list[list] = [
+        [n, n + 1, n + 2, cc[0], cc[1], cc[2]]] if cc else []
 
     for pi in range(n):
         px, py = pts[pi]
@@ -984,11 +1056,13 @@ def _apply_post_processing(
     if uvs:
         _assign_uvs(obj, uvs)
     if props.mesh_auto_rig:
-        _assign_bone_vertex_groups(obj, verts, chains_used, props.mesh_envelope_factor)
+        _assign_bone_vertex_groups(
+            obj, verts, chains_used, props.mesh_envelope_factor)
         if not reuse_armature_mod or not any(
             m.type == 'ARMATURE' for m in obj.modifiers
         ):
-            obj.modifiers.new(name="Armature", type='ARMATURE').object = source_obj
+            obj.modifiers.new(
+                name="Armature", type='ARMATURE').object = source_obj
 
 
 class BONE_OT_generate_mesh(Operator):
@@ -1010,7 +1084,10 @@ class BONE_OT_generate_mesh(Operator):
             return False
         try:
             props = context.scene.rig_weaver_props
-            if props.mesh_mode == 'TREE' and not _NUMPY_AVAILABLE:
+            selected = set(context.selected_pose_bones)
+            message = _mesh_numpy_requirement_message(
+                props, len(_build_chains(selected)))
+            if message is not None and not _NUMPY_AVAILABLE:
                 return False
         except AttributeError:
             pass
@@ -1019,14 +1096,15 @@ class BONE_OT_generate_mesh(Operator):
     def execute(self, context):
         props = context.scene.rig_weaver_props
 
-        if props.mesh_mode == 'TREE' and not _NUMPY_AVAILABLE:
-            self.report({'ERROR'}, "RigWeaver: TREE mode requires NumPy — not available in this Blender build.")
-            return {'CANCELLED'}
-
         selected = set(context.selected_pose_bones)
         chains = _build_chains(selected)
         if not chains:
             self.report({'ERROR'}, "RigWeaver: No chains found in selection.")
+            return {'CANCELLED'}
+
+        message = _mesh_numpy_requirement_message(props, len(chains))
+        if message is not None and not _NUMPY_AVAILABLE:
+            self.report({'ERROR'}, message)
             return {'CANCELLED'}
 
         source_obj = context.object
@@ -1038,15 +1116,18 @@ class BONE_OT_generate_mesh(Operator):
         if len(chains) == 1:
             verts: list[Vector] = []
             faces: list[tuple[int, ...]] = []
-            uvs: list[tuple[float, float]] | None = ([] if props.mesh_generate_uvs else None)
+            uvs: list[tuple[float, float]] | None = (
+                [] if props.mesh_generate_uvs else None)
             _ribbon_from_chain(chains[0], props.mesh_ribbon_width,
                                props.mesh_bone_subdivisions, verts, faces, uvs)
             if not faces:
-                self.report({'ERROR'}, "RigWeaver: No geometry could be generated.")
+                self.report(
+                    {'ERROR'}, "RigWeaver: No geometry could be generated.")
                 return {'CANCELLED'}
             if props.mesh_triangulate:
                 faces = _triangulate_faces(faces)
-            obj = _create_mesh_object(props.mesh_output_name, verts, faces, source_obj, context)
+            obj = _create_mesh_object(
+                props.mesh_output_name, verts, faces, source_obj, context)
             _apply_post_processing(obj, verts, uvs, chains, props, source_obj)
             if props.mesh_set_parent:
                 obj.parent = source_obj
@@ -1075,14 +1156,16 @@ class BONE_OT_generate_mesh(Operator):
                     obj = _create_mesh_object(
                         f"{props.mesh_output_name}_{chain[0].name}", verts, faces, source_obj, context
                     )
-                    _apply_post_processing(obj, verts, uvs, [chain], props, source_obj)
+                    _apply_post_processing(
+                        obj, verts, uvs, [chain], props, source_obj)
                     if props.mesh_set_parent:
                         obj.parent = source_obj
                         obj.parent_type = 'OBJECT'
                         obj.matrix_parent_inverse = source_obj.matrix_world.inverted()
                     created.append(obj)
             if not created:
-                self.report({'ERROR'}, "RigWeaver: No geometry could be generated.")
+                self.report(
+                    {'ERROR'}, "RigWeaver: No geometry could be generated.")
                 return {'CANCELLED'}
             bpy.ops.pose.select_all(action='DESELECT')
             for obj in created:
@@ -1097,12 +1180,15 @@ class BONE_OT_generate_mesh(Operator):
         # ------------------------------------------------------------------
         result = _build_geometry(props, chains)
         if result is None:
-            self.report({'ERROR'}, "RigWeaver: No geometry could be generated.")
+            self.report(
+                {'ERROR'}, "RigWeaver: No geometry could be generated.")
             return {'CANCELLED'}
         all_verts, all_faces, all_uvs, chains_used = result
 
-        obj = _create_mesh_object(props.mesh_output_name, all_verts, all_faces, source_obj, context)
-        _apply_post_processing(obj, all_verts, all_uvs, chains_used, props, source_obj)
+        obj = _create_mesh_object(
+            props.mesh_output_name, all_verts, all_faces, source_obj, context)
+        _apply_post_processing(obj, all_verts, all_uvs,
+                               chains_used, props, source_obj)
         if props.mesh_set_parent:
             obj.parent = source_obj
             obj.parent_type = 'OBJECT'
@@ -1138,7 +1224,10 @@ class BONE_OT_update_mesh(Operator):
             return False
         try:
             props = context.scene.rig_weaver_props
-            if props.mesh_mode == 'TREE' and not _NUMPY_AVAILABLE:
+            selected = set(context.selected_pose_bones)
+            message = _mesh_numpy_requirement_message(
+                props, len(_build_chains(selected)))
+            if message is not None and not _NUMPY_AVAILABLE:
                 return False
         except AttributeError:
             pass
@@ -1152,14 +1241,15 @@ class BONE_OT_update_mesh(Operator):
     def execute(self, context):
         props = context.scene.rig_weaver_props
 
-        if props.mesh_mode == 'TREE' and not _NUMPY_AVAILABLE:
-            self.report({'ERROR'}, "RigWeaver: TREE mode requires NumPy — not available in this Blender build.")
-            return {'CANCELLED'}
-
         selected = set(context.selected_pose_bones)
         chains = _build_chains(selected)
         if not chains:
             self.report({'ERROR'}, "RigWeaver: No chains found in selection.")
+            return {'CANCELLED'}
+
+        message = _mesh_numpy_requirement_message(props, len(chains))
+        if message is not None and not _NUMPY_AVAILABLE:
+            self.report({'ERROR'}, message)
             return {'CANCELLED'}
 
         source_obj = context.object
@@ -1188,7 +1278,8 @@ class BONE_OT_update_mesh(Operator):
                 if not faces:
                     continue
                 target_name = f"{props.mesh_output_name}_{chain[0].name}"
-                existing = next((o for o in tagged if o.name == target_name), None)
+                existing = next(
+                    (o for o in tagged if o.name == target_name), None)
                 if existing:
                     _replace_mesh_data(existing, verts, faces)
                     _apply_post_processing(
@@ -1202,7 +1293,8 @@ class BONE_OT_update_mesh(Operator):
                 else:
                     obj = _create_mesh_object(
                         target_name, verts, faces, source_obj, context)
-                    _apply_post_processing(obj, verts, uvs, [chain], props, source_obj)
+                    _apply_post_processing(
+                        obj, verts, uvs, [chain], props, source_obj)
                     if props.mesh_set_parent:
                         obj.parent = source_obj
                         obj.parent_type = 'OBJECT'
@@ -1217,12 +1309,14 @@ class BONE_OT_update_mesh(Operator):
         # All other modes → update the first tagged object in-place
         # ------------------------------------------------------------------
         if not tagged:
-            self.report({'ERROR'}, "RigWeaver: No proxy mesh found to update. Use Generate Proxy Mesh instead.")
+            self.report(
+                {'ERROR'}, "RigWeaver: No proxy mesh found to update. Use Generate Proxy Mesh instead.")
             return {'CANCELLED'}
 
         result = _build_geometry(props, chains)
         if result is None:
-            self.report({'ERROR'}, "RigWeaver: No geometry could be generated.")
+            self.report(
+                {'ERROR'}, "RigWeaver: No geometry could be generated.")
             return {'CANCELLED'}
         all_verts, all_faces, all_uvs, chains_used = result
 
@@ -1259,7 +1353,8 @@ def deactivate_envelope_preview(props, context) -> None:
     """Remove the envelope draw handler and clear the active flag."""
     global _envelope_draw_handle
     if _envelope_draw_handle is not None:
-        bpy.types.SpaceView3D.draw_handler_remove(_envelope_draw_handle, 'WINDOW')
+        bpy.types.SpaceView3D.draw_handler_remove(
+            _envelope_draw_handle, 'WINDOW')
         _envelope_draw_handle = None
     props.ui_envelope_preview_active = False
     for area in context.screen.areas:
@@ -1372,7 +1467,8 @@ def _on_load_post_envelope_preview(_filepath):
     global _envelope_draw_handle
     if _envelope_draw_handle is not None:
         try:
-            bpy.types.SpaceView3D.draw_handler_remove(_envelope_draw_handle, 'WINDOW')
+            bpy.types.SpaceView3D.draw_handler_remove(
+                _envelope_draw_handle, 'WINDOW')
         except Exception:
             pass
         _envelope_draw_handle = None
@@ -1391,7 +1487,8 @@ def register():
 def unregister():
     global _envelope_draw_handle
     if _envelope_draw_handle is not None:
-        bpy.types.SpaceView3D.draw_handler_remove(_envelope_draw_handle, 'WINDOW')
+        bpy.types.SpaceView3D.draw_handler_remove(
+            _envelope_draw_handle, 'WINDOW')
         _envelope_draw_handle = None
     if _on_load_post_envelope_preview in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.remove(_on_load_post_envelope_preview)
