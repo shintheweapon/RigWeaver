@@ -235,6 +235,76 @@ def _cr_col(
     ]
 
 
+def _solve_nc_spline_M(
+    pts_np: "_np.ndarray",
+    use_loop: bool,
+) -> "_np.ndarray":
+    """Solve for the second derivatives M of the natural cubic spline.
+
+    pts_np: (N, 3) array of chain positions at a single row depth.
+    use_loop: True → periodic (cyclic) boundary conditions for a closed cage;
+              False → natural end conditions (M[0] = M[N-1] = 0).
+
+    Returns M: (N, 3) second derivatives at each knot (uniform h=1 parameterisation).
+    """
+    N = len(pts_np)
+    if use_loop:
+        # Cyclic tridiagonal N×N: diagonal=4, off-diagonals=1 (including corners)
+        b = 6.0 * (
+            _np.roll(pts_np, -1, axis=0)
+            - 2.0 * pts_np
+            + _np.roll(pts_np,  1, axis=0)
+        )
+        A = 4.0 * _np.eye(N)
+        for k in range(N):
+            A[k, (k + 1) % N] += 1.0
+            A[k, (k - 1) % N] += 1.0
+        return _np.linalg.solve(A, b)
+    else:
+        if N <= 2:
+            return _np.zeros((N, 3))
+        # Interior tridiagonal (N-2)×(N-2); M[0]=M[N-1]=0
+        b = 6.0 * (pts_np[2:] - 2.0 * pts_np[1:-1] + pts_np[:-2])
+        n = N - 2
+        A = 4.0 * _np.eye(n)
+        for k in range(n - 1):
+            A[k, k + 1] = A[k + 1, k] = 1.0
+        M = _np.zeros((N, 3))
+        M[1:-1] = _np.linalg.solve(A, b)
+        return M
+
+
+def _nc_eval(
+    global_t: float,
+    pts_np: "_np.ndarray",
+    M_np: "_np.ndarray",
+    use_loop: bool,
+) -> "_np.ndarray":
+    """Evaluate the natural cubic spline at global_t.
+
+    Uses the pre-computed second derivatives M_np from _solve_nc_spline_M.
+    For LOOP mode indices wrap modulo N; for open surfaces the nearest end
+    segment is used, allowing cubic extrapolation at outer panel boundaries.
+
+    Returns a numpy (3,) position array.
+    """
+    N = len(pts_np)
+    s = int(math.floor(global_t))
+    lt = global_t - s
+    if use_loop:
+        s = s % N
+        p0, p1 = pts_np[s], pts_np[(s + 1) % N]
+        m0, m1 = M_np[s],   M_np[(s + 1) % N]
+    else:
+        s  = max(0, min(s, N - 2))
+        p0, p1 = pts_np[s], pts_np[s + 1]
+        m0, m1 = M_np[s],   M_np[s + 1]
+    b = (p1 - p0) - (2.0 * m0 + m1) / 6.0
+    c = m0 / 2.0
+    d = (m1 - m0) / 6.0
+    return p0 + b * lt + c * lt * lt + d * lt * lt * lt
+
+
 def _chain_levels(
     chain: list,
     subdivisions: int = 1,
@@ -440,8 +510,9 @@ def _cross_section_mesh(
     resolution:          quad columns per panel in the lateral direction.
     subdivisions:        row subdivisions per bone segment in the longitudinal direction.
     row_interp:          interpolation along each chain ('LINEAR' or 'CATMULL_ROM').
-    lateral_interp:      interpolation across adjacent chains ('LINEAR' or 'CATMULL_ROM').
-    lateral_cr_strength: blend factor for CATMULL_ROM lateral (0=linear, 1=full spline).
+    lateral_interp:      interpolation across adjacent chains
+                         ('LINEAR', 'CATMULL_ROM', or 'NATURAL_CUBIC').
+    lateral_cr_strength: blend factor for smooth lateral modes (0=linear, 1=full spline).
     """
     N = len(chains)
     all_levels = [_chain_levels(c, subdivisions, row_interp) for c in chains]
@@ -471,6 +542,22 @@ def _cross_section_mesh(
                     if i == N - 1
                     else _mid_col(all_levels[i], all_levels[i + 1], depth))
 
+    # Pre-solve natural cubic spline (once per _cross_section_mesh call, not per panel)
+    nc_data: "list[tuple] | None" = None
+    if lateral_interp == 'NATURAL_CUBIC':
+        max_d = max(len(lv) for lv in all_levels)
+        nc_data = []
+        for d in range(max_d):
+            pts = _np.array([list(_pos(all_levels[k], d)) for k in range(N)], dtype=float)
+            nc_data.append((pts, _solve_nc_spline_M(pts, use_loop)))
+
+    def _nc_col_at(global_t: float, depth: int) -> "list[Vector]":
+        """Sample the pre-solved natural cubic spline at global_t for all row depths."""
+        return [
+            Vector(_nc_eval(global_t, nc_data[d][0], nc_data[d][1], use_loop))
+            for d in range(depth)
+        ]
+
     for i in range(N):
         depth = len(all_levels[i])
         center_col = all_levels[i][:depth]  # exact chain position — always a vertex
@@ -480,33 +567,45 @@ def _cross_section_mesh(
             # Each panel spans t ∈ [i-0.5, i+0.5].  Sample the global Catmull-Rom
             # through all N chain columns at the correct parameter values so that
             # panel boundaries lie on the smooth spline, not on chord midpoints.
-            cr_left      = _cr_col(all_levels, N, i - 0.5,               depth, use_loop)
-            cr_right     = _cr_col(all_levels, N, i + 0.5,               depth, use_loop)
-            cr_left_int  = [_cr_col(all_levels, N, i - 0.5 + s / resolution, depth, use_loop)
+            sm_left      = _cr_col(all_levels, N, i - 0.5,               depth, use_loop)
+            sm_right     = _cr_col(all_levels, N, i + 0.5,               depth, use_loop)
+            sm_left_int  = [_cr_col(all_levels, N, i - 0.5 + s / resolution, depth, use_loop)
                             for s in range(1, resolution)]
-            cr_right_int = [_cr_col(all_levels, N, i + s / resolution,   depth, use_loop)
+            sm_right_int = [_cr_col(all_levels, N, i + s / resolution,   depth, use_loop)
                             for s in range(1, resolution)]
 
+        elif lateral_interp == 'NATURAL_CUBIC':
+            # Same panel-parameter scheme as CATMULL_ROM, using the C2-continuous
+            # natural cubic spline pre-solved above.  Chain i sits at t=i; panel
+            # boundaries at t=i±0.5 lie on the smooth spline through all N chains.
+            sm_left      = _nc_col_at(i - 0.5,               depth)
+            sm_right     = _nc_col_at(i + 0.5,               depth)
+            sm_left_int  = [_nc_col_at(i - 0.5 + s / resolution, depth)
+                            for s in range(1, resolution)]
+            sm_right_int = [_nc_col_at(i + s / resolution,   depth)
+                            for s in range(1, resolution)]
+
+        if lateral_interp in ('CATMULL_ROM', 'NATURAL_CUBIC'):
             if lateral_cr_strength >= 1.0:
-                left_col     = cr_left
-                right_col    = cr_right
-                left_interp  = cr_left_int
-                right_interp = cr_right_int
+                left_col     = sm_left
+                right_col    = sm_right
+                left_interp  = sm_left_int
+                right_interp = sm_right_int
             else:
-                # Blend global spline toward linear boundaries for partial strength
+                # Blend smooth spline toward linear boundaries for partial strength
                 lin_left  = _lin_boundary(i, 'left',  depth)
                 lin_right = _lin_boundary(i, 'right', depth)
                 lin_li    = _interpolate_levels(lin_left,  center_col, resolution)
                 lin_ri    = _interpolate_levels(center_col, lin_right, resolution)
                 t_inv = 1.0 - lateral_cr_strength
 
-                def _blend(cr, lin):
-                    return [_pos(cr, d).lerp(_pos(lin, d), t_inv) for d in range(depth)]
+                def _blend(sm, lin):
+                    return [_pos(sm, d).lerp(_pos(lin, d), t_inv) for d in range(depth)]
 
-                left_col     = _blend(cr_left,  lin_left)
-                right_col    = _blend(cr_right, lin_right)
-                left_interp  = [_blend(c, l) for c, l in zip(cr_left_int,  lin_li)]
-                right_interp = [_blend(c, r) for c, r in zip(cr_right_int, lin_ri)]
+                left_col     = _blend(sm_left,  lin_left)
+                right_col    = _blend(sm_right, lin_right)
+                left_interp  = [_blend(c, l) for c, l in zip(sm_left_int,  lin_li)]
+                right_interp = [_blend(c, r) for c, r in zip(sm_right_int, lin_ri)]
 
         else:  # LINEAR
             left_col     = _lin_boundary(i, 'left',  depth)

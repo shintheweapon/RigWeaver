@@ -64,13 +64,17 @@ _ZH_HANS: dict[tuple[str, str], str] = {
         "通过骨骼中点的平滑样条——消除骨骼连接处的折角",
     ("*", "Straight blend between adjacent chain columns"):
         "相邻骨骼链列之间的直线混合",
-    ("*", "Smooth spline through chain positions — genuinely curves the cross-section "
-         "profile for rounder silhouettes"):
-        "通过骨骼链位置的平滑样条——真正弯曲截面轮廓，使截面更圆滑",
-    ("*", "Lateral Strength"):          "横向强度",
-    ("*", "How strongly the Catmull-Rom spline curves the cross-section. "
+    ("*", "C1-continuous global spline through chain positions — smooth tangents, "
+         "round cross-section silhouette"):
+        "通过骨骼链位置的C1连续全局样条——平滑切线，圆滑截面轮廓",
+    ("*", "Natural Cubic"):             "自然三次样条",
+    ("*", "C2-continuous spline — smoothest possible interpolating curve; "
+         "minimises bending energy for the roundest silhouette"):
+        "C2连续样条——最平滑的插值曲线，最小化弯曲能量以获得最圆润的轮廓",
+    ("*", "Smooth Strength"):           "平滑强度",
+    ("*", "How strongly the smooth spline curves the cross-section. "
           "0 = straight (same as Linear), 1 = full spline curvature."):
-        "Catmull-Rom 样条弯曲截面的强度。0 = 直线（与线性相同），1 = 完整样条曲率。",
+        "平滑样条弯曲截面的强度。0 = 直线（与线性相同），1 = 完整样条曲率。",
     ("*", "Ribbon Width"):              "带状宽度",
     ("*", "Gap Factor"):                "间隙系数",
     ("*", "Bridge Filter"):             "桥接过滤器",
