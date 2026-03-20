@@ -389,6 +389,7 @@ class BONE_OT_extract_used_armature(Operator):
             used_names: set[str] = set(cached)
         else:
             used_names = _collect_weighted_names(source_obj)
+            props.last_weighted_bones = json.dumps(sorted(used_names))
 
         if not used_names:
             self.report({'ERROR'}, "RigWeaver: No bones with vertex weights found.")
