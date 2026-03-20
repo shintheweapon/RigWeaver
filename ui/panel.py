@@ -115,6 +115,8 @@ class VIEW3D_PT_rig_weaver(Panel):
                     row.prop(props, "mesh_bone_subdivisions")
                     box.prop(props, "mesh_row_interpolation")
                     box.prop(props, "mesh_lateral_interpolation")
+                    if props.mesh_lateral_interpolation == 'CATMULL_ROM':
+                        box.prop(props, "mesh_lateral_cr_strength", slider=True)
                 else:
                     box.prop(props, "mesh_bone_subdivisions")
 

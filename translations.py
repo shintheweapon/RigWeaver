@@ -67,6 +67,10 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     ("*", "Smooth spline through chain positions — genuinely curves the cross-section "
          "profile for rounder silhouettes"):
         "通过骨骼链位置的平滑样条——真正弯曲截面轮廓，使截面更圆滑",
+    ("*", "Lateral Strength"):          "横向强度",
+    ("*", "How strongly the Catmull-Rom spline curves the cross-section. "
+          "0 = straight (same as Linear), 1 = full spline curvature."):
+        "Catmull-Rom 样条弯曲截面的强度。0 = 直线（与线性相同），1 = 完整样条曲率。",
     ("*", "Ribbon Width"):              "带状宽度",
     ("*", "Gap Factor"):                "间隙系数",
     ("*", "Bridge Filter"):             "桥接过滤器",
