@@ -40,6 +40,7 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     ("*", "Preview Rig"):               "预览骨骼绑定",
     ("*", "Update Rig"):                "更新骨骼绑定",
     ("*", "Set as Parent"):             "设为父级",
+    ("*", "AUTO requires NumPy"):       "AUTO 模式需要 NumPy",
 
     # --- Extract properties ---
     ("*", "Retarget Meshes"):           "重定向网格",

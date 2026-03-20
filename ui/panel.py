@@ -8,6 +8,12 @@ import bpy
 from bpy.app.translations import pgettext_iface as iface_
 from bpy.types import Panel
 
+try:
+    import numpy as _np
+    _PANEL_NUMPY_OK = True
+except ImportError:
+    _PANEL_NUMPY_OK = False
+
 
 class RIG_WEAVER_UL_vg_list(bpy.types.UIList):
     """Scrollable vertex-group list with checkbox toggle buttons."""
@@ -119,6 +125,8 @@ class VIEW3D_PT_rig_weaver(Panel):
                 row.prop(props, "mesh_triangulate", toggle=True)
                 row.prop(props, "mesh_generate_uvs", toggle=True)
 
+                box.separator(factor=0.5)
+
                 # Rigging
                 box.prop(props, "mesh_auto_rig")
                 if props.mesh_auto_rig:
@@ -182,18 +190,30 @@ class VIEW3D_PT_rig_from_mesh(Panel):
             ).mode = 'OBJECT'
             return
 
-        # Chain and bone count — compact two-column row
+        # ── Algorithm ──────────────────────────────────────────────────────
         row = box.row(align=True)
         row.prop(props, "rig_chains")
         row.prop(props, "rig_bones_per_chain")
 
         box.prop(props, "rig_up_axis")
+
+        if props.rig_up_axis == 'AUTO' and not _PANEL_NUMPY_OK:
+            row = box.row()
+            row.alert = True
+            row.label(text=iface_("AUTO requires NumPy"), icon='ERROR')
+
+        box.separator(factor=0.5)
+
+        # ── Source mesh ────────────────────────────────────────────────────
         box.prop(props, "rig_auto_weights")
         if props.rig_auto_weights:
             box.prop(props, "rig_envelope_factor")
-
-        box.prop(props, "rig_output_name")
         box.prop(props, "rig_set_parent")
+
+        box.separator(factor=0.5)
+
+        # ── Output + actions ───────────────────────────────────────────────
+        box.prop(props, "rig_output_name")
 
         preview_icon = 'HIDE_OFF' if props.ui_rig_preview_active else 'HIDE_ON'
         box.operator(
