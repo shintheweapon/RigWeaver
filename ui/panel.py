@@ -110,14 +110,15 @@ class VIEW3D_PT_rig_weaver(Panel):
 
                 # U/V resolution + interpolation controls (grouped by axis)
                 if mesh_mode not in ('INDIVIDUAL', 'TREE'):
-                    row = box.row(align=True)
-                    row.prop(props, "mesh_bone_subdivisions")      # U Subdivisions
-                    row.prop(props, "mesh_row_interpolation")      # U Interpolation
-                    row = box.row(align=True)
-                    row.prop(props, "mesh_panel_resolution")       # V Columns
-                    row.prop(props, "mesh_lateral_interpolation")  # V Interpolation
+                    col = box.column()
+                    col.use_property_split = True
+                    col.prop(props, "mesh_bone_subdivisions")       # U Subdivisions (along chain)
+                    col.prop(props, "mesh_row_interpolation")       # U Interpolation (along chain)
+                    col.separator(factor=0.5)
+                    col.prop(props, "mesh_panel_resolution")        # V Columns (between chains)
+                    col.prop(props, "mesh_lateral_interpolation")   # V Interpolation (between chains)
                     if props.mesh_lateral_interpolation != 'LINEAR':
-                        box.prop(props, "mesh_lateral_cr_strength", slider=True)  # V Strength
+                        col.prop(props, "mesh_lateral_cr_strength", slider=True)  # V Strength
                 else:
                     box.prop(props, "mesh_bone_subdivisions")
 
