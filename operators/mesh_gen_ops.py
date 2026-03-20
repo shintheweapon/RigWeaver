@@ -204,9 +204,35 @@ def _catmull_rom_point(
     )
 
 
-def _col(levels: list[Vector], depth: int) -> list[Vector]:
-    """Return a column of exactly `depth` entries, clamping with _pos."""
-    return [_pos(levels, d) for d in range(depth)]
+def _cr_col(
+    all_levels: "list[list[Vector]]",
+    N: int,
+    global_t: float,
+    depth: int,
+    use_loop: bool,
+) -> "list[Vector]":
+    """Sample the global Catmull-Rom spline through all chain columns at global_t.
+
+    Chain i is at integer parameter i.  global_t may be fractional (e.g. i + 0.5
+    for the midpoint between chains i and i+1).  For close_loop the chain index
+    wraps modulo N; for open surfaces it clamps to the first/last chain.
+    """
+    s = int(math.floor(global_t))
+    lt = global_t - s
+    if use_loop:
+        def ci(k: int) -> int: return k % N
+    else:
+        def ci(k: int) -> int: return max(0, min(k, N - 1))
+    return [
+        _catmull_rom_point(
+            _pos(all_levels[ci(s - 1)], d),
+            _pos(all_levels[ci(s)],     d),
+            _pos(all_levels[ci(s + 1)], d),
+            _pos(all_levels[ci(s + 2)], d),
+            lt,
+        )
+        for d in range(depth)
+    ]
 
 
 def _chain_levels(
@@ -309,49 +335,21 @@ def _interpolate_levels(
     levels_A: list[Vector],
     levels_B: list[Vector],
     resolution: int,
-    lateral_interp: str = 'LINEAR',
-    cr_p0: "list[Vector] | None" = None,
-    cr_p3: "list[Vector] | None" = None,
 ) -> list[list[Vector]]:
-    """
-    Return (resolution - 1) intermediate level-lists interpolated between
-    levels_A and levels_B.  resolution=1 returns [].
-
-    lateral_interp:
-      'LINEAR'      — straight lerp between the two columns.
-      'CATMULL_ROM' — smooth Catmull-Rom spline; cr_p0 and cr_p3 must be
-                      supplied as the phantom control columns that bracket the
-                      segment (cr_p0 before levels_A, cr_p3 after levels_B).
-                      Falls back to LINEAR when phantoms are absent.
+    """Return (resolution - 1) intermediate level-lists linearly interpolated
+    between levels_A and levels_B.  resolution=1 returns [].
 
     When one list is shorter, its last position is reused for missing depths
     so that dropout tapering is preserved in interpolated columns.
     """
     if resolution <= 1:
         return []
-
     max_depth = max(len(levels_A), len(levels_B))
-    result: list[list[Vector]] = []
-
-    if lateral_interp == 'CATMULL_ROM' and cr_p0 is not None and cr_p3 is not None:
-        for step in range(1, resolution):
-            t = step / resolution
-            result.append([
-                _catmull_rom_point(
-                    _pos(cr_p0,     d),
-                    _pos(levels_A,  d),
-                    _pos(levels_B,  d),
-                    _pos(cr_p3,     d),
-                    t,
-                )
-                for d in range(max_depth)
-            ])
-    else:  # LINEAR (or CATMULL_ROM fallback when phantoms are absent)
-        for step in range(1, resolution):
-            t = step / resolution
-            result.append([_pos(levels_A, d).lerp(_pos(levels_B, d), t)
-                           for d in range(max_depth)])
-    return result
+    return [
+        [_pos(levels_A, d).lerp(_pos(levels_B, d), step / resolution)
+         for d in range(max_depth)]
+        for step in range(1, resolution)
+    ]
 
 
 def _fill_columns(
@@ -427,6 +425,7 @@ def _cross_section_mesh(
     uv_list: list[tuple[float, float]] | None = None,
     row_interp: str = 'LINEAR',
     lateral_interp: str = 'LINEAR',
+    lateral_cr_strength: float = 1.0,
 ) -> None:
     """
     Build a connected cross-section mesh from multiple chains of any length.
@@ -437,11 +436,12 @@ def _cross_section_mesh(
     chains (vs N-1 in an edge-aligned scheme) and each bone runs through the
     centre of its panel — matching the single-chain ribbon behaviour.
 
-    close_loop:     connect last chain back to first (cylindrical surfaces, N≥3).
-    resolution:     quad columns per panel in the lateral direction.
-    subdivisions:   row subdivisions per bone segment in the longitudinal direction.
-    row_interp:     interpolation along each chain ('LINEAR' or 'CATMULL_ROM').
-    lateral_interp: interpolation across adjacent chains ('LINEAR' or 'CATMULL_ROM').
+    close_loop:          connect last chain back to first (cylindrical surfaces, N≥3).
+    resolution:          quad columns per panel in the lateral direction.
+    subdivisions:        row subdivisions per bone segment in the longitudinal direction.
+    row_interp:          interpolation along each chain ('LINEAR' or 'CATMULL_ROM').
+    lateral_interp:      interpolation across adjacent chains ('LINEAR' or 'CATMULL_ROM').
+    lateral_cr_strength: blend factor for CATMULL_ROM lateral (0=linear, 1=full spline).
     """
     N = len(chains)
     all_levels = [_chain_levels(c, subdivisions, row_interp) for c in chains]
@@ -456,34 +456,65 @@ def _cross_section_mesh(
         return [_pos(L_inner, d) * 1.5 - _pos(L_outer, d) * 0.5
                 for d in range(depth)]
 
+    def _lin_boundary(i, side, depth):
+        """Linear (midpoint / extrapolated) panel boundary for chain i."""
+        if side == 'left':
+            if use_loop:
+                return _mid_col(all_levels[(i - 1) % N], all_levels[i], depth)
+            return (_extrap_col(all_levels[0], all_levels[1], depth)
+                    if i == 0
+                    else _mid_col(all_levels[i - 1], all_levels[i], depth))
+        else:  # 'right'
+            if use_loop:
+                return _mid_col(all_levels[i], all_levels[(i + 1) % N], depth)
+            return (_extrap_col(all_levels[N - 1], all_levels[N - 2], depth)
+                    if i == N - 1
+                    else _mid_col(all_levels[i], all_levels[i + 1], depth))
+
     for i in range(N):
         depth = len(all_levels[i])
+        center_col = all_levels[i][:depth]  # exact chain position — always a vertex
 
-        if use_loop:
-            left_col  = _mid_col(all_levels[(i - 1) % N], all_levels[i],           depth)
-            right_col = _mid_col(all_levels[i],            all_levels[(i + 1) % N], depth)
-            # Phantom control columns for Catmull-Rom lateral spline:
-            #   left half  (left_col→center_col): p0=chain[i-1], p3=right_col
-            #   right half (center_col→right_col): p0=left_col,  p3=chain[i+1]
-            cr_prev = _col(all_levels[(i - 1) % N], depth)
-            cr_next = _col(all_levels[(i + 1) % N], depth)
-        else:
-            left_col  = (_extrap_col(all_levels[0],     all_levels[1],     depth)
-                         if i == 0
-                         else _mid_col(all_levels[i - 1], all_levels[i],   depth))
-            right_col = (_extrap_col(all_levels[N - 1], all_levels[N - 2], depth)
-                         if i == N - 1
-                         else _mid_col(all_levels[i],   all_levels[i + 1], depth))
-            # Clamp phantom columns at boundaries (produces zero tangent → clamped spline)
-            cr_prev = _col(all_levels[max(i - 1, 0)],     depth)
-            cr_next = _col(all_levels[min(i + 1, N - 1)], depth)
+        if lateral_interp == 'CATMULL_ROM':
+            # Model chain index as the global spline parameter (chain i → t=i).
+            # Each panel spans t ∈ [i-0.5, i+0.5].  Sample the global Catmull-Rom
+            # through all N chain columns at the correct parameter values so that
+            # panel boundaries lie on the smooth spline, not on chord midpoints.
+            cr_left      = _cr_col(all_levels, N, i - 0.5,               depth, use_loop)
+            cr_right     = _cr_col(all_levels, N, i + 0.5,               depth, use_loop)
+            cr_left_int  = [_cr_col(all_levels, N, i - 0.5 + s / resolution, depth, use_loop)
+                            for s in range(1, resolution)]
+            cr_right_int = [_cr_col(all_levels, N, i + s / resolution,   depth, use_loop)
+                            for s in range(1, resolution)]
 
-        center_col   = all_levels[i][:depth]  # actual bone positions — always a vertex
-        left_interp  = _interpolate_levels(left_col,   center_col, resolution, lateral_interp,
-                                           cr_p0=cr_prev,    cr_p3=right_col)
-        right_interp = _interpolate_levels(center_col, right_col,  resolution, lateral_interp,
-                                           cr_p0=left_col,   cr_p3=cr_next)
-        all_columns  = [left_col] + left_interp + [center_col] + right_interp + [right_col]
+            if lateral_cr_strength >= 1.0:
+                left_col     = cr_left
+                right_col    = cr_right
+                left_interp  = cr_left_int
+                right_interp = cr_right_int
+            else:
+                # Blend global spline toward linear boundaries for partial strength
+                lin_left  = _lin_boundary(i, 'left',  depth)
+                lin_right = _lin_boundary(i, 'right', depth)
+                lin_li    = _interpolate_levels(lin_left,  center_col, resolution)
+                lin_ri    = _interpolate_levels(center_col, lin_right, resolution)
+                t_inv = 1.0 - lateral_cr_strength
+
+                def _blend(cr, lin):
+                    return [_pos(cr, d).lerp(_pos(lin, d), t_inv) for d in range(depth)]
+
+                left_col     = _blend(cr_left,  lin_left)
+                right_col    = _blend(cr_right, lin_right)
+                left_interp  = [_blend(c, l) for c, l in zip(cr_left_int,  lin_li)]
+                right_interp = [_blend(c, r) for c, r in zip(cr_right_int, lin_ri)]
+
+        else:  # LINEAR
+            left_col     = _lin_boundary(i, 'left',  depth)
+            right_col    = _lin_boundary(i, 'right', depth)
+            left_interp  = _interpolate_levels(left_col,   center_col, resolution)
+            right_interp = _interpolate_levels(center_col, right_col,  resolution)
+
+        all_columns = [left_col] + left_interp + [center_col] + right_interp + [right_col]
         _fill_columns(all_columns, len(chains[i]), len(chains[i]), vert_list, face_list, uv_list)
 
 
@@ -792,6 +823,7 @@ def _build_geometry(
                     uv_list=all_uvs,
                     row_interp=props.mesh_row_interpolation,
                     lateral_interp=props.mesh_lateral_interpolation,
+                    lateral_cr_strength=props.mesh_lateral_cr_strength,
                 )
             chains_used.extend(strip)
 

@@ -136,6 +136,16 @@ class RigWeaverProperties(PropertyGroup):
         ],
         default='LINEAR',
     )
+    mesh_lateral_cr_strength: FloatProperty(
+        name="Lateral Strength",
+        description=(
+            "How strongly the Catmull-Rom spline curves the cross-section. "
+            "0 = straight (same as Linear), 1 = full spline curvature."
+        ),
+        default=1.0,
+        min=0.0,
+        max=1.0,
+    )
     mesh_ribbon_width: FloatProperty(
         name="Ribbon Width",
         description="Width of the ribbon mesh generated from a single bone chain",
