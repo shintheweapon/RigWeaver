@@ -796,12 +796,17 @@ class BONE_OT_generate_mesh(Operator):
 
     @classmethod
     def poll(cls, context):
-        return (
-            context.object is not None
-            and context.object.type == 'ARMATURE'
-            and context.mode == 'POSE'
-            and bool(context.selected_pose_bones)
-        )
+        if context.object is None or context.object.type != 'ARMATURE':
+            return False
+        if context.mode != 'POSE' or not context.selected_pose_bones:
+            return False
+        try:
+            props = context.scene.rig_weaver_props
+            if props.mesh_mode == 'TREE' and not _NUMPY_AVAILABLE:
+                return False
+        except AttributeError:
+            pass
+        return True
 
     def execute(self, context):
         props = context.scene.rig_weaver_props
@@ -923,6 +928,12 @@ class BONE_OT_update_mesh(Operator):
             return False
         if not context.selected_pose_bones:
             return False
+        try:
+            props = context.scene.rig_weaver_props
+            if props.mesh_mode == 'TREE' and not _NUMPY_AVAILABLE:
+                return False
+        except AttributeError:
+            pass
         name = obj.name
         return any(
             o.get("rig_weaver_source") == name
@@ -997,6 +1008,10 @@ class BONE_OT_update_mesh(Operator):
         # ------------------------------------------------------------------
         # All other modes → update the first tagged object in-place
         # ------------------------------------------------------------------
+        if not tagged:
+            self.report({'ERROR'}, "RigWeaver: No proxy mesh found to update. Use Generate Proxy Mesh instead.")
+            return {'CANCELLED'}
+
         result = _build_geometry(props, chains)
         if result is None:
             self.report({'ERROR'}, "RigWeaver: No geometry could be generated.")

@@ -260,7 +260,7 @@ def _draw_rig_preview() -> None:
         props = bpy.context.scene.rig_weaver_props
         show_envelope = props.rig_auto_weights
         factor = props.rig_envelope_factor
-    except Exception:
+    except (AttributeError, ReferenceError):
         show_envelope = False
 
     if show_envelope:
