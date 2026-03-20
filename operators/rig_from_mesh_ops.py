@@ -396,6 +396,7 @@ class BONE_OT_generate_rig_from_mesh(Operator):
         for coll in mesh_obj.users_collection:
             coll.objects.link(arm_obj)
         arm_obj.show_in_front = True
+        arm_obj["rig_weaver_source_mesh"] = mesh_obj.name
 
         bpy.ops.object.select_all(action='DESELECT')
         arm_obj.select_set(True)
@@ -462,11 +463,146 @@ class BONE_OT_generate_rig_from_mesh(Operator):
         return {'FINISHED'}
 
 
+class BONE_OT_update_rig_from_mesh(Operator):
+    bl_idname = "rig_weaver.update_rig_from_mesh"
+    bl_label = "Update Rig"
+    bl_description = (
+        "Regenerate the existing bone cage armature in-place using the current "
+        "settings, preserving the Armature modifier on the source mesh."
+    )
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        if context.object is None or context.object.type != 'MESH':
+            return False
+        if context.object.mode != 'OBJECT':
+            return False
+        name = context.object.name
+        return any(
+            o.get("rig_weaver_source_mesh") == name
+            for o in bpy.data.objects
+            if o.type == 'ARMATURE'
+        )
+
+    def execute(self, context):
+        props = context.scene.rig_weaver_props
+        if not _NUMPY_AVAILABLE and props.rig_up_axis == 'AUTO':
+            self.report(
+                {'ERROR'},
+                "RigWeaver: AUTO axis detection requires NumPy — "
+                "not available in this Blender build. Choose an explicit axis.",
+            )
+            return {'CANCELLED'}
+
+        mesh_obj = context.object
+
+        # ── Re-compute bone positions ─────────────────────────────────────────
+        bone_levels = _compute_rig_bone_positions(mesh_obj, props)
+        if bone_levels is None:
+            self.report({'ERROR'}, "RigWeaver: Mesh has too few vertices.")
+            return {'CANCELLED'}
+
+        n_chains = props.rig_chains
+        n_levels = props.rig_bones_per_chain + 1
+
+        verts_world: list[Vector] = [
+            mesh_obj.matrix_world @ v.co for v in mesh_obj.data.vertices
+        ]
+
+        # ── Find the tagged armature ──────────────────────────────────────────
+        arm_obj = next(
+            (o for o in bpy.data.objects
+             if o.type == 'ARMATURE'
+             and o.get("rig_weaver_source_mesh") == mesh_obj.name),
+            None,
+        )
+        if arm_obj is None:
+            self.report({'ERROR'}, "RigWeaver: No tagged armature found for this mesh.")
+            return {'CANCELLED'}
+        arm_data = arm_obj.data
+
+        # ── Enter Edit Mode and rebuild bones ─────────────────────────────────
+        bpy.ops.object.select_all(action='DESELECT')
+        arm_obj.select_set(True)
+        context.view_layer.objects.active = arm_obj
+
+        if 'FINISHED' not in bpy.ops.object.mode_set(mode='EDIT'):
+            self.report({'ERROR'}, "RigWeaver: Could not enter Edit Mode on armature.")
+            return {'CANCELLED'}
+
+        for eb in list(arm_data.edit_bones):
+            arm_data.edit_bones.remove(eb)
+
+        all_bone_name_chains: list[list[str]] = []
+        for ci in range(n_chains):
+            levels = bone_levels[ci]
+            chain_names: list[str] = []
+            prev_eb = None
+            for li in range(n_levels - 1):
+                bone_name = f"{props.rig_output_name}_{ci:02d}_{li:02d}"
+                eb = arm_data.edit_bones.new(bone_name)
+                eb.head = levels[li]
+                eb.tail = levels[li + 1]
+                if prev_eb is not None:
+                    eb.parent = prev_eb
+                    eb.use_connect = True
+                prev_eb = eb
+                chain_names.append(bone_name)
+            if chain_names:
+                all_bone_name_chains.append(chain_names)
+
+        if not all_bone_name_chains:
+            bpy.ops.object.mode_set(mode='OBJECT')
+            self.report({'ERROR'}, "RigWeaver: No bones could be generated.")
+            return {'CANCELLED'}
+
+        if 'FINISHED' not in bpy.ops.object.mode_set(mode='OBJECT'):
+            self.report({'ERROR'}, "RigWeaver: Could not return to Object Mode.")
+            return {'CANCELLED'}
+
+        # ── Rename armature to match current output name ──────────────────────
+        arm_obj.name = props.rig_output_name
+        arm_data.name = props.rig_output_name
+
+        # ── Re-assign weights if enabled ──────────────────────────────────────
+        if props.rig_auto_weights:
+            mesh_obj.vertex_groups.clear()
+            pose_chains = [
+                [arm_obj.pose.bones[name] for name in chain]
+                for chain in all_bone_name_chains
+            ]
+            from . import mesh_gen_ops
+            mesh_gen_ops._assign_bone_vertex_groups(
+                mesh_obj, verts_world, pose_chains, props.rig_envelope_factor,
+            )
+            # Add Armature modifier only if not already present
+            if not any(m.type == 'ARMATURE' for m in mesh_obj.modifiers):
+                mod = mesh_obj.modifiers.new(name="Armature", type='ARMATURE')
+                mod.object = arm_obj
+
+        # ── Restore selection + deactivate preview ────────────────────────────
+        context.view_layer.objects.active = arm_obj
+        arm_obj.select_set(True)
+        if props.ui_rig_preview_active:
+            deactivate_rig_preview(props, context)
+        bone_count = sum(len(c) for c in all_bone_name_chains)
+        self.report(
+            {'INFO'},
+            f"RigWeaver: Updated '{arm_obj.name}' with {bone_count} bone(s).",
+        )
+        return {'FINISHED'}
+
+
 # ---------------------------------------------------------------------------
 # Registration
 # ---------------------------------------------------------------------------
 
-classes = (BONE_OT_preview_rig_from_mesh, BONE_OT_generate_rig_from_mesh)
+classes = (
+    BONE_OT_preview_rig_from_mesh,
+    BONE_OT_generate_rig_from_mesh,
+    BONE_OT_update_rig_from_mesh,
+)
 
 
 def register():

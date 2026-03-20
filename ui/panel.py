@@ -201,12 +201,17 @@ class VIEW3D_PT_rig_from_mesh(Panel):
             icon=preview_icon,
         )
 
-        row = box.row()
+        row = box.row(align=True)
         row.scale_y = 1.3
         row.operator(
             "rig_weaver.generate_rig_from_mesh",
             text=iface_("Generate Rig"),
             icon='ARMATURE_DATA',
+        )
+        row.operator(
+            "rig_weaver.update_rig_from_mesh",
+            text=iface_("Update Rig"),
+            icon='FILE_REFRESH',
         )
 
 

@@ -38,6 +38,7 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     ("*", "Generate Rig"):              "生成骨骼绑定",
     ("*", "Generate Rig from Mesh"):    "从网格生成骨骼绑定",
     ("*", "Preview Rig"):               "预览骨骼绑定",
+    ("*", "Update Rig"):                "更新骨骼绑定",
 
     # --- Extract properties ---
     ("*", "Retarget Meshes"):           "重定向网格",
@@ -248,6 +249,11 @@ _ZH_HANS: dict[tuple[str, str], str] = {
           "decomposition. Bones radiate around the mesh's up axis from top to bottom."):
         "使用圆柱分解法从当前激活网格生成骨骼笼骨架，"
         "骨骼沿网格朝上轴向由顶到底辐射分布。",
+
+    ("*", "Regenerate the existing bone cage armature in-place using the current "
+          "settings, preserving the Armature modifier on the source mesh."):
+        "使用当前设置就地重新生成现有骨骼笼骨架，"
+        "保留源网格上的骨架修改器。",
 
     ("*", "Number of radial bone chains distributed around the mesh"):
         "围绕网格分布的放射状骨骼链数量",
