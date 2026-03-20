@@ -183,6 +183,14 @@ class RigWeaverProperties(PropertyGroup):
         ),
         default="proxy_mesh",
     )
+    mesh_set_parent: BoolProperty(
+        name="Set as Parent",
+        description=(
+            "Parent the generated mesh to the source armature so it follows "
+            "it in the outliner hierarchy. World transform is preserved."
+        ),
+        default=False,
+    )
     # JSON-serialised list of weighted bone names, cached between runs
     last_weighted_bones: StringProperty(default="[]")
 

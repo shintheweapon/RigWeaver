@@ -146,6 +146,7 @@ class VIEW3D_PT_rig_weaver(Panel):
 
                 # Output name + action buttons
                 box.prop(props, "mesh_output_name")
+                box.prop(props, "mesh_set_parent")
                 row = box.row(align=True)
                 row.scale_y = 1.3
                 row.operator("rig_weaver.generate_mesh",

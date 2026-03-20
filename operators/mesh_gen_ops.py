@@ -835,6 +835,10 @@ class BONE_OT_generate_mesh(Operator):
                 faces = _triangulate_faces(faces)
             obj = _create_mesh_object(props.mesh_output_name, verts, faces, source_obj, context)
             _apply_post_processing(obj, verts, uvs, chains, props, source_obj)
+            if props.mesh_set_parent:
+                obj.parent = source_obj
+                obj.parent_type = 'OBJECT'
+                obj.matrix_parent_inverse = source_obj.matrix_world.inverted()
             bpy.ops.pose.select_all(action='DESELECT')
             context.view_layer.objects.active = obj
             obj.select_set(True)
@@ -859,6 +863,10 @@ class BONE_OT_generate_mesh(Operator):
                         f"{props.mesh_output_name}_{chain[0].name}", verts, faces, source_obj, context
                     )
                     _apply_post_processing(obj, verts, uvs, [chain], props, source_obj)
+                    if props.mesh_set_parent:
+                        obj.parent = source_obj
+                        obj.parent_type = 'OBJECT'
+                        obj.matrix_parent_inverse = source_obj.matrix_world.inverted()
                     created.append(obj)
             if not created:
                 self.report({'ERROR'}, "RigWeaver: No geometry could be generated.")
@@ -882,6 +890,10 @@ class BONE_OT_generate_mesh(Operator):
 
         obj = _create_mesh_object(props.mesh_output_name, all_verts, all_faces, source_obj, context)
         _apply_post_processing(obj, all_verts, all_uvs, chains_used, props, source_obj)
+        if props.mesh_set_parent:
+            obj.parent = source_obj
+            obj.parent_type = 'OBJECT'
+            obj.matrix_parent_inverse = source_obj.matrix_world.inverted()
 
         bpy.ops.pose.select_all(action='DESELECT')
         context.view_layer.objects.active = obj
@@ -963,11 +975,19 @@ class BONE_OT_update_mesh(Operator):
                     _apply_post_processing(
                         existing, verts, uvs, [chain], props, source_obj,
                         reuse_armature_mod=True)
+                    if props.mesh_set_parent:
+                        existing.parent = source_obj
+                        existing.parent_type = 'OBJECT'
+                        existing.matrix_parent_inverse = source_obj.matrix_world.inverted()
                     updated += 1
                 else:
                     obj = _create_mesh_object(
                         target_name, verts, faces, source_obj, context)
                     _apply_post_processing(obj, verts, uvs, [chain], props, source_obj)
+                    if props.mesh_set_parent:
+                        obj.parent = source_obj
+                        obj.parent_type = 'OBJECT'
+                        obj.matrix_parent_inverse = source_obj.matrix_world.inverted()
                     created += 1
             self.report(
                 {'INFO'},
@@ -990,6 +1010,10 @@ class BONE_OT_update_mesh(Operator):
         _apply_post_processing(
             target, all_verts, all_uvs, chains_used, props, source_obj,
             reuse_armature_mod=True)
+        if props.mesh_set_parent:
+            target.parent = source_obj
+            target.parent_type = 'OBJECT'
+            target.matrix_parent_inverse = source_obj.matrix_world.inverted()
 
         bpy.ops.pose.select_all(action='DESELECT')
         context.view_layer.objects.active = target
