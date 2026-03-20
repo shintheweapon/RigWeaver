@@ -91,59 +91,65 @@ class RigWeaverProperties(PropertyGroup):
         default=False,
     )
     mesh_panel_resolution: IntProperty(
-        name="Column Resolution",
+        name="V Columns",
         description=(
-            "Quad columns per panel in the lateral direction (between adjacent chains). "
-            "1 = single column."
+            "Number of quad columns per panel in the V direction "
+            "(across adjacent chains — defines the cross-section resolution). "
+            "1 = flat panel per chain, higher values produce a smoother profile."
         ),
         default=2,
         min=1,
         max=16,
     )
     mesh_bone_subdivisions: IntProperty(
-        name="Row Resolution",
+        name="U Subdivisions",
         description=(
-            "Subdivisions per bone segment in the longitudinal direction (along the chain). "
-            "1 = one row per bone, 2+ = interpolated rows within each segment."
+            "Number of subdivisions per bone segment in the U direction "
+            "(along each chain — adds rows between bone midpoints). "
+            "1 = one row per bone, 2+ = interpolated rows for smoother length curves."
         ),
         default=2,
         min=1,
         max=16,
     )
     mesh_row_interpolation: EnumProperty(
-        name="Row Interpolation",
+        name="U Interpolation",
         description=(
-            "Interpolation method along each chain (longitudinal direction). "
-            "Has no effect when Row Resolution is 1."
+            "Interpolation method in the U direction (along each chain). "
+            "Has no effect when U Subdivisions is 1."
         ),
         items=[
             ('LINEAR',      "Linear",
-             "Straight lines between bone midpoints"),
+             "Straight lines between bone midpoints along the chain"),
             ('CATMULL_ROM', "Catmull-Rom",
-             "Smooth spline through bone midpoints — eliminates angular kinks at bone junctions"),
+             "Smooth spline through bone midpoints — removes angular kinks "
+             "where bones meet"),
         ],
         default='LINEAR',
     )
     mesh_lateral_interpolation: EnumProperty(
-        name="Lateral Interpolation",
-        description="Interpolation method across adjacent chains (lateral direction)",
+        name="V Interpolation",
+        description=(
+            "Interpolation method in the V direction (across adjacent chains — "
+            "controls the shape of the cross-section profile)."
+        ),
         items=[
             ('LINEAR',        "Linear",
-             "Straight blend between adjacent chain columns"),
+             "Straight lines between adjacent chain columns — flat-sided panels"),
             ('CATMULL_ROM',   "Catmull-Rom",
-             "C1-continuous global spline through chain positions — smooth tangents, "
-             "round cross-section silhouette"),
+             "C1 smooth spline through all chain positions — curved cross-section "
+             "silhouette with continuous tangents"),
             ('NATURAL_CUBIC', "Natural Cubic",
-             "C2-continuous spline — smoothest possible interpolating curve; "
-             "minimises bending energy for the roundest silhouette"),
+             "C2 smooth spline — curvature is also continuous at every chain; "
+             "the mathematically smoothest possible cross-section curve"),
         ],
         default='LINEAR',
     )
     mesh_lateral_cr_strength: FloatProperty(
-        name="Smooth Strength",
+        name="V Strength",
         description=(
-            "How strongly the smooth spline curves the cross-section. "
-            "0 = straight (same as Linear), 1 = full spline curvature."
+            "Blend between straight (Linear) and curved (spline) V interpolation. "
+            "0 = fully straight, 1 = full spline curvature."
         ),
         default=1.0,
         min=0.0,

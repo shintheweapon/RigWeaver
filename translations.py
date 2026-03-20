@@ -52,29 +52,30 @@ _ZH_HANS: dict[tuple[str, str], str] = {
 
     # --- Mesh gen properties ---
     ("*", "Mode"):                      "模式",
-    ("*", "Column Resolution"):         "列分辨率",
-    ("*", "Row Resolution"):            "行分辨率",
-    ("*", "Row Interpolation"):         "行插值",
-    ("*", "Lateral Interpolation"):     "横向插值",
+    ("*", "V Columns"):                 "V方向列数",
+    ("*", "U Subdivisions"):            "U方向细分数",
+    ("*", "U Interpolation"):           "U方向插值",
+    ("*", "V Interpolation"):           "V方向插值",
     ("*", "Linear"):                    "线性",
     ("*", "Catmull-Rom"):               "Catmull-Rom 样条",
-    ("*", "Straight lines between bone midpoints"):
-        "骨骼中点间直线插值",
-    ("*", "Smooth spline through bone midpoints — eliminates angular kinks at bone junctions"):
-        "通过骨骼中点的平滑样条——消除骨骼连接处的折角",
-    ("*", "Straight blend between adjacent chain columns"):
-        "相邻骨骼链列之间的直线混合",
-    ("*", "C1-continuous global spline through chain positions — smooth tangents, "
-         "round cross-section silhouette"):
-        "通过骨骼链位置的C1连续全局样条——平滑切线，圆滑截面轮廓",
     ("*", "Natural Cubic"):             "自然三次样条",
-    ("*", "C2-continuous spline — smoothest possible interpolating curve; "
-         "minimises bending energy for the roundest silhouette"):
-        "C2连续样条——最平滑的插值曲线，最小化弯曲能量以获得最圆润的轮廓",
-    ("*", "Smooth Strength"):           "平滑强度",
-    ("*", "How strongly the smooth spline curves the cross-section. "
-          "0 = straight (same as Linear), 1 = full spline curvature."):
-        "平滑样条弯曲截面的强度。0 = 直线（与线性相同），1 = 完整样条曲率。",
+    ("*", "Straight lines between bone midpoints along the chain"):
+        "沿骨骼链在骨骼中点间直线插值",
+    ("*", "Smooth spline through bone midpoints — removes angular kinks "
+         "where bones meet"):
+        "通过骨骼中点的平滑样条——消除骨骼连接处的折角",
+    ("*", "Straight lines between adjacent chain columns — flat-sided panels"):
+        "相邻骨骼链列之间的直线——平面面板",
+    ("*", "C1 smooth spline through all chain positions — curved cross-section "
+         "silhouette with continuous tangents"):
+        "通过所有骨骼链位置的C1平滑样条——截面轮廓曲线，切线连续",
+    ("*", "C2 smooth spline — curvature is also continuous at every chain; "
+         "the mathematically smoothest possible cross-section curve"):
+        "C2平滑样条——每个骨骼链处曲率也连续；数学上最平滑的截面曲线",
+    ("*", "V Strength"):                "V方向强度",
+    ("*", "Blend between straight (Linear) and curved (spline) V interpolation. "
+          "0 = fully straight, 1 = full spline curvature."):
+        "在直线（线性）与曲线（样条）V方向插值之间混合。0 = 完全直线，1 = 完整样条曲率。",
     ("*", "Ribbon Width"):              "带状宽度",
     ("*", "Gap Factor"):                "间隙系数",
     ("*", "Bridge Filter"):             "桥接过滤器",
