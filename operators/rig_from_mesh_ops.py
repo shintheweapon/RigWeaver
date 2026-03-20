@@ -236,22 +236,61 @@ def _update_rig_preview_cache(context) -> None:
 
 
 def _draw_rig_preview() -> None:
-    """SpaceView3D POST_VIEW callback — draws bone cage preview lines."""
+    """SpaceView3D POST_VIEW callback — draws bone cage preview lines and (optionally) envelope circles."""
     if not _GPU_AVAILABLE or not _rig_preview_lines:
         return
 
-    verts = []
-    for head, tail in _rig_preview_lines:
-        verts.append(head)
-        verts.append(tail)
-
     shader = gpu.shader.from_builtin('UNIFORM_COLOR')
     shader.bind()
-    shader.uniform_float("color", (0.2, 0.9, 0.4, 0.85))
     gpu.state.blend_set('ALPHA')
+
+    # ── Bone lines (green) ───────────────────────────────────────────────────
+    line_verts = []
+    for head, tail in _rig_preview_lines:
+        line_verts.append(head)
+        line_verts.append(tail)
+
+    shader.uniform_float("color", (0.2, 0.9, 0.4, 0.85))
     gpu.state.line_width_set(2.0)
-    batch = batch_for_shader(shader, 'LINES', {"pos": verts})
+    batch = batch_for_shader(shader, 'LINES', {"pos": line_verts})
     batch.draw(shader)
+
+    # ── Envelope circles (orange) — only when Assign Weights is on ──────────
+    try:
+        props = bpy.context.scene.rig_weaver_props
+        show_envelope = props.rig_auto_weights
+        factor = props.rig_envelope_factor
+    except Exception:
+        show_envelope = False
+
+    if show_envelope:
+        SEG = 32
+        angles = [2.0 * math.pi * i / SEG for i in range(SEG + 1)]
+        shader.uniform_float("color", (0.9, 0.5, 0.1, 0.7))
+        gpu.state.line_width_set(1.5)
+
+        for head, tail in _rig_preview_lines:
+            hx, hy, hz = head
+            tx, ty, tz = tail
+            bone_len = math.sqrt(
+                (tx - hx) ** 2 + (ty - hy) ** 2 + (tz - hz) ** 2
+            )
+            r = bone_len * factor
+            if r < 1e-6:
+                continue
+
+            for center in (head, tail):
+                cx, cy, cz = center
+                for ax0, ax1 in ((0, 1), (1, 2), (0, 2)):
+                    ring = []
+                    for a in angles:
+                        pt = [cx, cy, cz]
+                        pt[ax0] += math.cos(a) * r
+                        pt[ax1] += math.sin(a) * r
+                        ring.append(tuple(pt))
+                    b = batch_for_shader(shader, 'LINE_STRIP', {"pos": ring})
+                    b.draw(shader)
+
     gpu.state.blend_set('NONE')
     gpu.state.line_width_set(1.0)
 
