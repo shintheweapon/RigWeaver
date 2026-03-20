@@ -128,12 +128,11 @@ class RigWeaverProperties(PropertyGroup):
         name="Lateral Interpolation",
         description="Interpolation method across adjacent chains (lateral direction)",
         items=[
-            ('LINEAR', "Linear",
+            ('LINEAR',      "Linear",
              "Straight blend between adjacent chain columns"),
-            ('COSINE', "Cosine",
-             "Sinusoidal ease-in/out — rounder cross-section silhouette"),
-            ('CUBIC',  "Cubic",
-             "Cubic smoothstep ease-in/out — stronger rounding than cosine"),
+            ('CATMULL_ROM', "Catmull-Rom",
+             "Smooth spline through chain positions — genuinely curves the cross-section "
+             "profile for rounder silhouettes"),
         ],
         default='LINEAR',
     )
