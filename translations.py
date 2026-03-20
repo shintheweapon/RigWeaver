@@ -1,4 +1,4 @@
-"""
+﻿"""
 RigWeaver — UI translations.
 
 Add new locales by extending the _ZH_HANS dict below and registering the
@@ -22,7 +22,7 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     # --- VG panel UI ---
     ("*", "Previewing mixed weights"):  "正在预览混合权重",
     ("*", "Exit Preview"):              "退出预览",
-    ("*", "Mix into Group"):            "混合至组",
+    ("*", "Mix into Group"):            "混合到组",
     ("*", "No vertex groups"):          "无顶点组",
     ("*", "All"):                       "全选",
     ("*", "None"):                      "全不选",
@@ -43,7 +43,7 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     ("*", "AUTO requires NumPy"):       "AUTO 模式需要 NumPy",
 
     # --- Extract properties ---
-    ("*", "Retarget Meshes"):           "重定向网格",
+    ("*", "Retarget Meshes"):           "重定向网格绑定",
     ("*", "Auto Bone Orientation"):     "自动骨骼朝向",
     ("*", "Connect Child Bones"):       "连接子骨骼",
     ("*", "Separate Objects"):          "分离为单独对象",
@@ -83,7 +83,7 @@ _ZH_HANS: dict[tuple[str, str], str] = {
         "在直线（线性）与曲线（样条）表面轮廓之间混合。0 = 完全直线，1 = 完整样条曲率。",
     ("*", "Ribbon Width"):              "带状宽度",
     ("*", "Gap Factor"):                "间隙系数",
-    ("*", "Bridge Filter"):             "桥接过滤器",
+    ("*", "Bridge Filter"):             "桥接过滤",
     ("*", "Weight Radius"):             "权重半径",
     ("*", "Auto-Rig"):                  "自动绑定",
     ("*", "Generate UVs"):              "生成UV",
@@ -93,7 +93,7 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     # --- Rig from Mesh properties ---
     ("*", "Chains"):                    "骨骼链数量",
     ("*", "Bones per Chain"):           "每链骨骼数",
-    ("*", "Up Axis"):                   "朝上轴向",
+    ("*", "Up Axis"):                   "上方向轴",
     ("*", "Assign Weights"):            "分配权重",
     ("*", "Auto"):                      "自动",
 
@@ -131,8 +131,8 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     "单条骨骼链生成带状网格，多条生成连接的横截面曲面，"
     "适合用作低面数模拟笼。",
 
-        ("*", "RigWeaver: Natural Cubic interpolation requires NumPy — not available in this Blender build."):
-        "RigWeaver：Natural Cubic 插值需要 NumPy，但当前 Blender 构建中不可用。",
+    ("*", "RigWeaver: Natural Cubic interpolation requires NumPy — not available in this Blender build."):
+        "RigWeaver：Natural Cubic 插值依赖 NumPy，但当前 Blender 版本未提供该模块。",
 
     ("*", "Regenerate geometry of existing proxy mesh object(s) from this armature "
           "using current settings and selected bones, preserving modifiers and transforms"):
@@ -145,7 +145,7 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     "半径 = 骨骼长度 × 权重半径",
 
     ("*", "Toggle this vertex group in/out of the active selection set"):
-        "切换此顶点组在当前选择集中的选中状态",
+        "将此顶点组加入或移出当前选择集",
 
     ("*", "Select vertices in all vertex groups"):   "选中所有顶点组",
     ("*", "Deselect all vertex groups"):             "取消选中所有顶点组",
@@ -192,6 +192,15 @@ _ZH_HANS: dict[tuple[str, str], str] = {
         "每段骨骼纵向（沿骨骼链方向）的细分数，"
         "1 = 每段一行，2及以上 = 段内插值多行",
 
+        ("*", "Curve shape used between bone midpoints along each chain (U direction). "
+                    "Has no effect when U Subdivisions is 1."):
+                "沿每条骨骼链的骨骼中点进行曲线插值（U 方向）。"
+                "当 U 细分为 1 时，此选项不起作用。",
+
+        ("*", "Curve shape used between adjacent chains (V direction — "
+                    "controls the surface profile)."):
+                "在相邻骨骼链之间进行曲线插值（V 方向），用于控制表面轮廓。",
+
     ("*", "Width of the ribbon mesh generated from a single bone chain"):
         "单条骨骼链生成的带状网格宽度",
 
@@ -234,7 +243,7 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     ("*", "Name of the vertex group to toggle"):    "要切换的顶点组名称",
 
     ("*", "JSON list of vertex group names active in the RigWeaver selector"):
-        "RigWeaver选择器中激活的顶点组名称JSON列表",
+        "RigWeaver 选择器中已选顶点组名称的 JSON 列表",
 
     ("*", "How to combine weights from multiple groups"): "多组权重的合并方式",
     ("*", "Name for the new merged vertex group"):        "新合并顶点组的名称",
@@ -289,8 +298,8 @@ _ZH_HANS: dict[tuple[str, str], str] = {
 
     ("*", "Parent the mesh to the generated armature so it follows it in "
           "the outliner hierarchy. World transform is preserved."):
-        "将网格设为已生成骨架的子级，使其跟随骨架出现在大纲视图层级中。"
-        "保留世界变换不变。",
+        "将网格设为生成骨架的子对象，使其在大纲层级中跟随骨架。"
+        "并保持世界变换不变。",
 
     ("*", "Number of radial bone chains distributed around the mesh"):
         "围绕网格分布的放射状骨骼链数量",
@@ -313,7 +322,7 @@ _ZH_HANS: dict[tuple[str, str], str] = {
         "超出所有范围的顶点将归属至最近骨骼。",
 
     ("*", "Base name for the generated armature object and its bones"):
-        "生成骨架对象及其骨骼的基础名称",
+        "生成骨架对象及骨骼的基础名称",
 
     ("*", "Detect automatically via PCA (requires NumPy)"):
         "通过PCA自动检测（需要NumPy）",
