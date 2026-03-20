@@ -190,14 +190,42 @@ def _assign_bone_vertex_groups(
                     vg.add([vi], weight, 'REPLACE')
 
 
-def _chain_levels(chain: list, subdivisions: int = 1) -> list[Vector]:
+def _catmull_rom_point(
+    p0: Vector, p1: Vector, p2: Vector, p3: Vector, t: float
+) -> Vector:
+    """Evaluate a Catmull-Rom spline at t ∈ [0, 1] between p1 and p2."""
+    t2 = t * t
+    t3 = t2 * t
+    return 0.5 * (
+        (2.0 * p1)
+        + (-p0 + p2) * t
+        + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2
+        + (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3
+    )
+
+
+def _smooth_t(t: float, method: str) -> float:
+    """Remap lerp parameter t for non-linear lateral interpolation."""
+    if method == 'COSINE':
+        return (1.0 - math.cos(t * math.pi)) * 0.5
+    if method == 'CUBIC':
+        return t * t * (3.0 - 2.0 * t)
+    return t  # LINEAR
+
+
+def _chain_levels(
+    chain: list,
+    subdivisions: int = 1,
+    row_interp: str = 'LINEAR',
+) -> list[Vector]:
     """
     Return world-space row positions for the cross-section mesh.
 
-    With subdivisions=1 (default): N+2 levels for N bones — one extension
-    before the first bone, one midpoint per bone, one extension after the last.
-    With subdivisions>1: each segment between consecutive base levels is split
-    into that many equal parts, giving (N+1)*subdivisions + 1 total levels.
+    With subdivisions=1: N+2 levels for N bones — one extension before the
+    first bone, one midpoint per bone, one extension after the last.
+    With subdivisions>1: each segment is split into that many parts using the
+    chosen row_interp method (LINEAR or CATMULL_ROM).
+    Note: CATMULL_ROM is identical to LINEAR when subdivisions=1.
     """
     v_first = Vector(chain[0].tail)  - Vector(chain[0].head)
     v_last  = Vector(chain[-1].tail) - Vector(chain[-1].head)
@@ -210,10 +238,22 @@ def _chain_levels(chain: list, subdivisions: int = 1) -> list[Vector]:
         return base_levels
 
     result = [base_levels[0]]
-    for i in range(len(base_levels) - 1):
-        a, b = base_levels[i], base_levels[i + 1]
-        for s in range(1, subdivisions + 1):
-            result.append(a.lerp(b, s / subdivisions))
+    n = len(base_levels)
+
+    if row_interp == 'CATMULL_ROM':
+        for i in range(n - 1):
+            p0 = base_levels[max(i - 1, 0)]
+            p1 = base_levels[i]
+            p2 = base_levels[i + 1]
+            p3 = base_levels[min(i + 2, n - 1)]
+            for s in range(1, subdivisions + 1):
+                result.append(_catmull_rom_point(p0, p1, p2, p3, s / subdivisions))
+    else:  # LINEAR
+        for i in range(n - 1):
+            a, b = base_levels[i], base_levels[i + 1]
+            for s in range(1, subdivisions + 1):
+                result.append(a.lerp(b, s / subdivisions))
+
     return result
 
 
@@ -273,11 +313,14 @@ def _interpolate_levels(
     levels_A: list[Vector],
     levels_B: list[Vector],
     resolution: int,
+    lateral_interp: str = 'LINEAR',
 ) -> list[list[Vector]]:
     """
-    Return (resolution - 1) intermediate level-lists linearly interpolated
-    between levels_A and levels_B.  resolution=1 returns [].
+    Return (resolution - 1) intermediate level-lists interpolated between
+    levels_A and levels_B.  resolution=1 returns [].
 
+    lateral_interp controls the parameter remapping: LINEAR (default),
+    COSINE (sinusoidal ease-in/out), or CUBIC (smoothstep ease-in/out).
     When one list is shorter, its last position is reused for missing depths
     so that dropout tapering is preserved in interpolated columns.
     """
@@ -288,7 +331,7 @@ def _interpolate_levels(
 
     result: list[list[Vector]] = []
     for step in range(1, resolution):
-        t = step / resolution
+        t = _smooth_t(step / resolution, lateral_interp)
         result.append([_pos(levels_A, d).lerp(_pos(levels_B, d), t)
                         for d in range(max_depth)])
     return result
@@ -365,6 +408,8 @@ def _cross_section_mesh(
     face_list: list[tuple[int, ...]],
     subdivisions: int = 1,
     uv_list: list[tuple[float, float]] | None = None,
+    row_interp: str = 'LINEAR',
+    lateral_interp: str = 'LINEAR',
 ) -> None:
     """
     Build a connected cross-section mesh from multiple chains of any length.
@@ -375,12 +420,14 @@ def _cross_section_mesh(
     chains (vs N-1 in an edge-aligned scheme) and each bone runs through the
     centre of its panel — matching the single-chain ribbon behaviour.
 
-    close_loop:   connect last chain back to first (cylindrical surfaces, N≥3).
-    resolution:   quad columns per panel in the lateral direction.
-    subdivisions: row subdivisions per bone segment in the longitudinal direction.
+    close_loop:     connect last chain back to first (cylindrical surfaces, N≥3).
+    resolution:     quad columns per panel in the lateral direction.
+    subdivisions:   row subdivisions per bone segment in the longitudinal direction.
+    row_interp:     interpolation along each chain ('LINEAR' or 'CATMULL_ROM').
+    lateral_interp: interpolation across adjacent chains ('LINEAR', 'COSINE', 'CUBIC').
     """
     N = len(chains)
-    all_levels = [_chain_levels(c, subdivisions) for c in chains]
+    all_levels = [_chain_levels(c, subdivisions, row_interp) for c in chains]
     use_loop = close_loop and N >= 3
 
     def _mid_col(LA, LB, depth):
@@ -407,8 +454,8 @@ def _cross_section_mesh(
                          else _mid_col(all_levels[i],   all_levels[i + 1], depth))
 
         center_col   = all_levels[i][:depth]  # actual bone positions — always a vertex
-        left_interp  = _interpolate_levels(left_col,   center_col, resolution)
-        right_interp = _interpolate_levels(center_col, right_col,  resolution)
+        left_interp  = _interpolate_levels(left_col,   center_col, resolution, lateral_interp)
+        right_interp = _interpolate_levels(center_col, right_col,  resolution, lateral_interp)
         all_columns  = [left_col] + left_interp + [center_col] + right_interp + [right_col]
         _fill_columns(all_columns, len(chains[i]), len(chains[i]), vert_list, face_list, uv_list)
 
@@ -716,6 +763,8 @@ def _build_geometry(
                     all_verts, all_faces,
                     subdivisions=props.mesh_bone_subdivisions,
                     uv_list=all_uvs,
+                    row_interp=props.mesh_row_interpolation,
+                    lateral_interp=props.mesh_lateral_interpolation,
                 )
             chains_used.extend(strip)
 

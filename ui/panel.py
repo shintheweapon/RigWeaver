@@ -108,11 +108,13 @@ class VIEW3D_PT_rig_weaver(Panel):
                 elif mesh_mode == 'TREE':
                     box.prop(props, "mesh_tree_alpha_factor")
 
-                # Resolution — compact two-column row when both apply
+                # Resolution + interpolation controls
                 if mesh_mode not in ('INDIVIDUAL', 'TREE'):
                     row = box.row(align=True)
                     row.prop(props, "mesh_panel_resolution")
                     row.prop(props, "mesh_bone_subdivisions")
+                    box.prop(props, "mesh_row_interpolation")
+                    box.prop(props, "mesh_lateral_interpolation")
                 else:
                     box.prop(props, "mesh_bone_subdivisions")
 
