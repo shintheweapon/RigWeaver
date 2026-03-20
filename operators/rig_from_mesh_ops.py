@@ -447,10 +447,22 @@ class BONE_OT_generate_rig_from_mesh(Operator):
             mesh_gen_ops._assign_bone_vertex_groups(
                 mesh_obj, verts_world, pose_chains, props.rig_envelope_factor,
             )
-            mod = mesh_obj.modifiers.new(name="Armature", type='ARMATURE')
-            mod.object = arm_obj
+            arm_mods = [m for m in mesh_obj.modifiers if m.type == 'ARMATURE']
+            if arm_mods:
+                arm_mods[0].object = arm_obj
+                for m in arm_mods[1:]:
+                    mesh_obj.modifiers.remove(m)
+            else:
+                mod = mesh_obj.modifiers.new(name="Armature", type='ARMATURE')
+                mod.object = arm_obj
 
-        # ── 9. Restore selection + deactivate preview ─────────────────────────
+        # ── 9. Optional re-parent ─────────────────────────────────────────────
+        if props.rig_set_parent:
+            mesh_obj.parent = arm_obj
+            mesh_obj.parent_type = 'OBJECT'
+            mesh_obj.matrix_parent_inverse = arm_obj.matrix_world.inverted()
+
+        # ── 10. Restore selection + deactivate preview ────────────────────────
         context.view_layer.objects.active = arm_obj
         arm_obj.select_set(True)
         if props.ui_rig_preview_active:
@@ -576,10 +588,20 @@ class BONE_OT_update_rig_from_mesh(Operator):
             mesh_gen_ops._assign_bone_vertex_groups(
                 mesh_obj, verts_world, pose_chains, props.rig_envelope_factor,
             )
-            # Add Armature modifier only if not already present
-            if not any(m.type == 'ARMATURE' for m in mesh_obj.modifiers):
+            arm_mods = [m for m in mesh_obj.modifiers if m.type == 'ARMATURE']
+            if arm_mods:
+                arm_mods[0].object = arm_obj
+                for m in arm_mods[1:]:
+                    mesh_obj.modifiers.remove(m)
+            else:
                 mod = mesh_obj.modifiers.new(name="Armature", type='ARMATURE')
                 mod.object = arm_obj
+
+        # ── Optional re-parent ────────────────────────────────────────────────
+        if props.rig_set_parent:
+            mesh_obj.parent = arm_obj
+            mesh_obj.parent_type = 'OBJECT'
+            mesh_obj.matrix_parent_inverse = arm_obj.matrix_world.inverted()
 
         # ── Restore selection + deactivate preview ────────────────────────────
         context.view_layer.objects.active = arm_obj

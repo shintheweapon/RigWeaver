@@ -39,6 +39,7 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     ("*", "Generate Rig from Mesh"):    "从网格生成骨骼绑定",
     ("*", "Preview Rig"):               "预览骨骼绑定",
     ("*", "Update Rig"):                "更新骨骼绑定",
+    ("*", "Set as Parent"):             "设为父级",
 
     # --- Extract properties ---
     ("*", "Retarget Meshes"):           "重定向网格",
@@ -254,6 +255,11 @@ _ZH_HANS: dict[tuple[str, str], str] = {
           "settings, preserving the Armature modifier on the source mesh."):
         "使用当前设置就地重新生成现有骨骼笼骨架，"
         "保留源网格上的骨架修改器。",
+
+    ("*", "Parent the mesh to the generated armature so it follows it in "
+          "the outliner hierarchy. World transform is preserved."):
+        "将网格设为已生成骨架的子级，使其跟随骨架出现在大纲视图层级中。"
+        "保留世界变换不变。",
 
     ("*", "Number of radial bone chains distributed around the mesh"):
         "围绕网格分布的放射状骨骼链数量",

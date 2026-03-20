@@ -193,6 +193,7 @@ class VIEW3D_PT_rig_from_mesh(Panel):
             box.prop(props, "rig_envelope_factor")
 
         box.prop(props, "rig_output_name")
+        box.prop(props, "rig_set_parent")
 
         preview_icon = 'HIDE_OFF' if props.ui_rig_preview_active else 'HIDE_ON'
         box.operator(

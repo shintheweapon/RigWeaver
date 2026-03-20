@@ -255,6 +255,14 @@ class RigWeaverProperties(PropertyGroup):
         description="Base name for the generated armature object and its bones",
         default="rig",
     )
+    rig_set_parent: BoolProperty(
+        name="Set as Parent",
+        description=(
+            "Parent the mesh to the generated armature so it follows it in "
+            "the outliner hierarchy. World transform is preserved."
+        ),
+        default=False,
+    )
     ui_expand_rig_from_mesh: BoolProperty(
         name="Generate Rig from Mesh",
         default=True,
