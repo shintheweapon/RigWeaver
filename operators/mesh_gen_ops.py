@@ -569,9 +569,9 @@ def _cross_section_mesh(
             # panel boundaries lie on the smooth spline, not on chord midpoints.
             sm_left      = _cr_col(all_levels, N, i - 0.5,               depth, use_loop)
             sm_right     = _cr_col(all_levels, N, i + 0.5,               depth, use_loop)
-            sm_left_int  = [_cr_col(all_levels, N, i - 0.5 + s / resolution, depth, use_loop)
+            sm_left_int  = [_cr_col(all_levels, N, i - 0.5 + s / (2 * resolution), depth, use_loop)
                             for s in range(1, resolution)]
-            sm_right_int = [_cr_col(all_levels, N, i + s / resolution,   depth, use_loop)
+            sm_right_int = [_cr_col(all_levels, N, i + s / (2 * resolution),       depth, use_loop)
                             for s in range(1, resolution)]
 
         elif lateral_interp == 'NATURAL_CUBIC':
@@ -580,9 +580,9 @@ def _cross_section_mesh(
             # boundaries at t=i±0.5 lie on the smooth spline through all N chains.
             sm_left      = _nc_col_at(i - 0.5,               depth)
             sm_right     = _nc_col_at(i + 0.5,               depth)
-            sm_left_int  = [_nc_col_at(i - 0.5 + s / resolution, depth)
+            sm_left_int  = [_nc_col_at(i - 0.5 + s / (2 * resolution), depth)
                             for s in range(1, resolution)]
-            sm_right_int = [_nc_col_at(i + s / resolution,   depth)
+            sm_right_int = [_nc_col_at(i + s / (2 * resolution),        depth)
                             for s in range(1, resolution)]
 
         if lateral_interp in ('CATMULL_ROM', 'NATURAL_CUBIC'):
