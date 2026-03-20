@@ -15,6 +15,7 @@ from __future__ import annotations
 import math
 
 import bpy
+from bpy.app.handlers import persistent
 from bpy.types import Operator
 from mathutils import Vector
 
@@ -627,9 +628,27 @@ classes = (
 )
 
 
+@persistent
+def _on_load_post_rig_preview(_filepath):
+    """Clear stale rig preview draw handler when a new file is loaded."""
+    global _rig_preview_handle, _rig_preview_lines
+    if _rig_preview_handle is not None:
+        try:
+            bpy.types.SpaceView3D.draw_handler_remove(_rig_preview_handle, 'WINDOW')
+        except Exception:
+            pass
+        _rig_preview_handle = None
+    _rig_preview_lines = []
+    try:
+        bpy.context.scene.rig_weaver_props.ui_rig_preview_active = False
+    except Exception:
+        pass
+
+
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
+    bpy.app.handlers.load_post.append(_on_load_post_rig_preview)
 
 
 def unregister():
@@ -637,5 +656,7 @@ def unregister():
     if _rig_preview_handle is not None:
         bpy.types.SpaceView3D.draw_handler_remove(_rig_preview_handle, 'WINDOW')
         _rig_preview_handle = None
+    if _on_load_post_rig_preview in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.remove(_on_load_post_rig_preview)
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)

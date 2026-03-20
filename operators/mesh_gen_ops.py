@@ -17,6 +17,7 @@ from mathutils import Matrix, Vector
 
 import bmesh
 import bpy
+from bpy.app.handlers import persistent
 from bpy.types import Operator
 
 try:
@@ -1143,9 +1144,26 @@ classes = (
 )
 
 
+@persistent
+def _on_load_post_envelope_preview(_filepath):
+    """Clear stale envelope preview draw handler when a new file is loaded."""
+    global _envelope_draw_handle
+    if _envelope_draw_handle is not None:
+        try:
+            bpy.types.SpaceView3D.draw_handler_remove(_envelope_draw_handle, 'WINDOW')
+        except Exception:
+            pass
+        _envelope_draw_handle = None
+    try:
+        bpy.context.scene.rig_weaver_props.ui_envelope_preview_active = False
+    except Exception:
+        pass
+
+
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
+    bpy.app.handlers.load_post.append(_on_load_post_envelope_preview)
 
 
 def unregister():
@@ -1153,5 +1171,7 @@ def unregister():
     if _envelope_draw_handle is not None:
         bpy.types.SpaceView3D.draw_handler_remove(_envelope_draw_handle, 'WINDOW')
         _envelope_draw_handle = None
+    if _on_load_post_envelope_preview in bpy.app.handlers.load_post:
+        bpy.app.handlers.load_post.remove(_on_load_post_envelope_preview)
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
