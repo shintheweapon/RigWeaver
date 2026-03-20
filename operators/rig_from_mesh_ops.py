@@ -310,6 +310,16 @@ def deactivate_rig_preview(props, context) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Shared poll helper
+# ---------------------------------------------------------------------------
+
+def _poll_active_mesh(context) -> bool:
+    """Return True when the active object is a MESH in Object Mode."""
+    obj = context.object
+    return obj is not None and obj.type == 'MESH' and obj.mode == 'OBJECT'
+
+
+# ---------------------------------------------------------------------------
 # Operators
 # ---------------------------------------------------------------------------
 
@@ -324,12 +334,7 @@ class BONE_OT_preview_rig_from_mesh(Operator):
 
     @classmethod
     def poll(cls, context):
-        return (
-            _GPU_AVAILABLE
-            and context.object is not None
-            and context.object.type == 'MESH'
-            and context.object.mode == 'OBJECT'
-        )
+        return _GPU_AVAILABLE and _poll_active_mesh(context)
 
     def execute(self, context):
         global _rig_preview_handle
@@ -360,9 +365,7 @@ class BONE_OT_generate_rig_from_mesh(Operator):
 
     @classmethod
     def poll(cls, context):
-        return (context.object is not None
-                and context.object.type == 'MESH'
-                and context.object.mode == 'OBJECT')
+        return _poll_active_mesh(context)
 
     def execute(self, context):
         # ── NumPy guard ───────────────────────────────────────────────────────
@@ -498,9 +501,7 @@ class BONE_OT_update_rig_from_mesh(Operator):
 
     @classmethod
     def poll(cls, context):
-        if context.object is None or context.object.type != 'MESH':
-            return False
-        if context.object.mode != 'OBJECT':
+        if not _poll_active_mesh(context):
             return False
         name = context.object.name
         return any(

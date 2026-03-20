@@ -312,6 +312,17 @@ def _collect_weighted_names(armature_obj: bpy.types.Object) -> set[str]:
 
     return weighted
 
+def _walk_ancestors(
+    name: str,
+    parent_name_map: dict[str, str | None],
+):
+    """Yield each ancestor of *name* from immediate parent up to the root."""
+    current = parent_name_map.get(name)
+    while current is not None:
+        yield current
+        current = parent_name_map.get(current)
+
+
 def _topo_sort(
     used_names: set[str],
     parent_name_map: dict[str, str | None],
@@ -325,12 +336,10 @@ def _topo_sort(
             return
         visited.add(name)
         # Walk up past any non-weighted intermediates to the nearest used ancestor
-        current = parent_name_map.get(name)
-        while current is not None:
-            if current in used_names:
-                visit(current)  # ensure ancestor is ordered before this bone
+        for ancestor in _walk_ancestors(name, parent_name_map):
+            if ancestor in used_names:
+                visit(ancestor)  # ensure ancestor is ordered before this bone
                 break
-            current = parent_name_map.get(current)
         ordered.append(name)
 
     for name in used_names:
@@ -348,12 +357,10 @@ def _find_used_parent(
     whose name is in used_names, or None if no such ancestor exists.
     The bone itself is not considered.
     """
-    current = parent_name_map.get(name)
-    while current is not None:
-        if current in used_names:
-            return current
-        current = parent_name_map.get(current)
-    return None
+    return next(
+        (a for a in _walk_ancestors(name, parent_name_map) if a in used_names),
+        None,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -501,9 +508,15 @@ class BONE_OT_extract_used_armature(Operator):
         # Step 2: end bones with a parent → inherit parent's corrected direction.
         # Step 3: recalculate roll so local Z aligns with global +Z.
         if props.auto_bone_orientation:
+            # Build parent→children map once (O(N)) to avoid O(N²) scan per bone.
+            children_map: dict = {}
+            for eb in new_arm_data.edit_bones:
+                if eb.parent is not None:
+                    children_map.setdefault(eb.parent, []).append(eb)
+
             # Step 1: non-end bones
             for name, new_eb in new_bone_map.items():
-                children = [c for c in new_arm_data.edit_bones if c.parent == new_eb]
+                children = children_map.get(new_eb, [])
                 if not children:
                     continue
                 avg_child_head = sum(
@@ -516,7 +529,7 @@ class BONE_OT_extract_used_armature(Operator):
 
             # Step 2: end bones — inherit parent's already-corrected direction
             for name, new_eb in new_bone_map.items():
-                children = [c for c in new_arm_data.edit_bones if c.parent == new_eb]
+                children = children_map.get(new_eb, [])
                 if children or not new_eb.parent:
                     continue  # not an end bone, or no parent to inherit from
                 parent_dir = new_eb.parent.tail - new_eb.parent.head
