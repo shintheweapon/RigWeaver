@@ -424,7 +424,7 @@ class BONE_OT_generate_rig_from_mesh(Operator):
                     eb.parent = prev_eb
                     eb.use_connect = True
                 prev_eb = eb
-                chain_names.append(bone_name)
+                chain_names.append(eb.name)
             if chain_names:
                 all_bone_name_chains.append(chain_names)
 
@@ -436,6 +436,9 @@ class BONE_OT_generate_rig_from_mesh(Operator):
         if 'FINISHED' not in bpy.ops.object.mode_set(mode='OBJECT'):
             self.report({'ERROR'}, "RigWeaver: Could not return to Object Mode.")
             return {'CANCELLED'}
+
+        # Ensure the depsgraph processes the new armature so pose.bones is populated.
+        context.view_layer.update()
 
         # ── 8. Auto-weights ───────────────────────────────────────────────────
         # Armature is at world origin so pose_bone.head/.tail == world space.
@@ -561,7 +564,7 @@ class BONE_OT_update_rig_from_mesh(Operator):
                     eb.parent = prev_eb
                     eb.use_connect = True
                 prev_eb = eb
-                chain_names.append(bone_name)
+                chain_names.append(eb.name)
             if chain_names:
                 all_bone_name_chains.append(chain_names)
 
