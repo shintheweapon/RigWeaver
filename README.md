@@ -24,10 +24,11 @@ RigWeaver helps you:
 2. Install in Blender:
    - `Edit > Preferences > Extensions > Install from File`
    - Select generated zip: `RigWeaver_v<version>.zip`.
+   - Or drag and drop the `RigWeaver_v<version>.zip` into view port.
 3. Open `3D Viewport > Sidebar (N) > RigWeaver`.
 
 Note:
-- The build script derives the zip base name from `blender_manifest.toml` `name`, then normalizes non-alphanumeric characters to `_`.
+- The build script derives the zip base name from `blender_manifest.toml` `name`, then normalises non-alphanumeric characters to `_`.
 
 ### 3. Main Workflows
 
@@ -91,20 +92,11 @@ Place your media files here and README will render them automatically.
 #### Proxy Update Cycle
 ![Proxy Update Mesh](docs/media/proxy-update-cycle.gif)
 
-#### Rig From Mesh Preview -> Generate
-![Rig From Mesh Preview to Generate](docs/media/rig-from-mesh-preview-generate.gif)
+#### Rig From Mesh Preview -> Generate/Update
+![Rig From Mesh Preview to Generate/Update](docs/media/rig-from-mesh-preview-generate.gif)
 
 #### Vertex Group Preview Mix -> Commit
 ![Vertex Group Mix Workflow](docs/media/vg-mix-workflow.gif)
-
-#### Optional Static Panel Overview
-![RigWeaver Panel Overview](docs/media/panel-overview.png)
-
-Recommended GIF capture guidelines:
-- Keep each GIF around 4-10 seconds.
-- Crop to the action area (panel + relevant viewport region).
-- Avoid large dimensions/files; optimize for GitHub page load.
-- Use clear starting/ending states so loop is understandable.
 
 ### 5. Mode/Context Requirements
 - `Extract Deforming Bones`: active object must be Armature in Object Mode.
@@ -150,6 +142,7 @@ Recommended GIF capture guidelines:
 2. 在 Blender 安装：
    - `编辑 > 偏好设置 > 扩展 > 从文件安装`
    - 选择生成的 zip：`RigWeaver_v<version>.zip`。
+   - 或者拖拽`RigWeaver_v<version>.zip`到 Blender。
 3. 打开 `3D 视图 > 侧边栏(N) > RigWeaver`。
 
 说明：
@@ -159,38 +152,38 @@ Recommended GIF capture guidelines:
 
 #### A. 提取形变骨骼（骨架对象，物体模式）
 1. 选中骨架对象。
-2. 在 `RigWeaver > Extract Deforming Bones` 中按需设置：
-   - `Retarget Meshes`
-   - `Auto Bone Orientation`
-   - `Connect Child Bones`
-3. 点击 `Extract Deforming Bones`。
+2. 在 `RigWeaver > 提取形变骨骼` 中按需设置：
+   - `重定向网格绑定`
+   - `自动骨骼朝向`
+   - `连接子骨骼`
+3. 点击 `提取形变骨骼`。
 
 结果：
 - 生成仅包含实际参与权重变形骨骼的精简骨架。
 
-#### B. 生成代理网格（骨架对象，姿态模式）
+#### B. 生成简化网格（骨架对象，姿态模式）
 1. 选中骨架并切换到姿态模式。
 2. 选择骨骼/骨骼链。
-3. 在 `RigWeaver > Generate Mesh` 设置：
-   - `Mode`（Individual / Surface / Loop / Auto-Split / Tree）
+3. 在 `RigWeaver > 生成网格` 设置：
+   - `模式`（独立条带 / 连接曲面 / 封闭环形 / 自动分割 / 树状）
    - 纵向/横向插值与分辨率
-   - 可选 `Auto-Rig`、`Generate UVs`、`Subdivision Surface`
-4. 点击 `Preview` 反复预览。
-5. 点击 `Generate Proxy Mesh` 提交，或 `Update Mesh` 更新现有网格。
-6. 需要时点击 `Discard Preview` 手动丢弃线框预览。
+   - 可选 `自动绑定`、`生成UV`、`细分曲面`
+4. 点击 `预览` 反复预览。
+5. 点击 `生成简化网格` 提交，或 `更新网格` 更新现有网格。
+6. 需要时点击 `退出预览` 手动退出线框预览。
 
 结果：
-- 生成用于模拟或绑定流程的低模代理网格。
+- 生成用于模拟或绑定流程的低模简化网格。
 
 #### C. 从网格生成绑定（网格对象，物体模式）
 1. 选中网格对象。
-2. 在 `RigWeaver > Generate Rig from Mesh` 设置：
-   - `Chains`
-   - `Bones per Chain`
-   - `Up Axis`（`AUTO` 需要 NumPy）
-   - 可选自动权重/父子关系
-3. 点击 `Preview Rig`。
-4. 点击 `Generate Rig` 或 `Update Rig`。
+2. 在 `RigWeaver > 从网格生成绑定` 设置：
+   - `骨骼链数量`
+   - `每链骨骼数`
+   - `上方朝向轴`（自动模式需要 NumPy）
+   - 自动权重/父子关系
+3. 点击 `预览绑定`。
+4. 点击 `生成绑定` 或 `更新绑定`。
 
 结果：
 - 根据网格形状生成/更新放射式骨架笼。
@@ -198,51 +191,42 @@ Recommended GIF capture guidelines:
 #### D. 顶点组选择与混合（网格对象，编辑/权重绘制）
 1. 选中带顶点组的网格。
 2. 进入编辑模式。
-3. 在 `Vertex Group Select` 中勾选并设置：
-   - `Blend Mode`
-   - `Target`
-   - `Remove Source Groups`
-4. 点击 `Preview Mix`（进入权重绘制预览）。
-5. 点击 `Mix into Group` 提交。
+3. 在 `顶点组选择` 中勾选并设置：
+   - `混合模式`
+   - `目标`
+   - `删除源组❗`
+4. 点击 `预览混合`（进入权重绘制预览）。
+5. 点击 `混合到组` 提交。
 
 结果：
 - 快速将多个顶点组混合到目标组。
 
-### 4. GIF 演示占位（docs/media）
+### 4. GIF 演示
 将文件放入下列路径后，README 会自动显示。
 
-#### 代理预览 -> 提交生成
+#### 简化预览 -> 提交生成
 ![Proxy Preview to Generate](docs/media/proxy-preview-generate.gif)
 
-#### 代理网格更新流程
+#### 简化网格更新流程
 ![Proxy Update Mesh](docs/media/proxy-update-cycle.gif)
 
-#### 从网格生成绑定 预览 -> 生成
-![Rig From Mesh Preview to Generate](docs/media/rig-from-mesh-preview-generate.gif)
+#### 从网格生成绑定 预览 -> 生成和更新
+![Rig From Mesh Preview to Generate/Update](docs/media/rig-from-mesh-preview-generate.gif)
 
 #### 顶点组预览混合 -> 提交
 ![Vertex Group Mix Workflow](docs/media/vg-mix-workflow.gif)
 
-#### 可选静态图：面板总览
-![RigWeaver Panel Overview](docs/media/panel-overview.png)
-
-建议：
-- 每段 GIF 控制在 4-10 秒。
-- 裁剪到关键操作区域（面板 + 相关视口）。
-- 控制分辨率和体积，避免 README 加载过慢。
-- 起止状态清晰，循环时也能看懂。
-
-### 5. 模式/上下文要求
-- `Extract Deforming Bones`：激活对象为骨架，且在物体模式。
-- `Generate Mesh` / `Preview Mesh` / `Update Mesh`：骨架对象 + 姿态模式 + 已选骨骼。
-- `Generate Rig from Mesh`：激活对象为网格，且在物体模式。
-- `Vertex Group Select`：网格对象，编辑模式或权重绘制模式。
+### 5. 模式要求
+- `提取形变骨骼`：激活对象为骨架，且在物体模式。
+- `生成网格` / `预览网格` / `更新网格`：骨架对象 + 姿态模式 + 已选骨骼。
+- `从网格生成绑定`：激活对象为网格，且在物体模式。
+- `顶点组选择`：网格对象，编辑模式或权重绘制模式。
 
 ### 6. NumPy/GPU 说明
 - NumPy 用于：
-  - 代理网格 `Tree` 模式，
-  - 从网格生成绑定时的 `AUTO` 上轴检测。
-- 叠加层预览功能依赖 GPU 预览能力。
+  - 简化网格 `Tree` 模式，
+  - 从网格生成绑定时的自动上朝向轴的检测。
+- 叠加层预览功能依赖于 GPU 的预览能力。
 
 ### 7. 目录结构
 ```

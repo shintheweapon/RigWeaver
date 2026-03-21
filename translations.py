@@ -31,10 +31,10 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     ("*", "Target"):                    "目标",
 
     # --- Operator labels ---
-    ("*", "Generate Proxy Mesh"):       "生成代理网格",
+    ("*", "Generate Proxy Mesh"):       "生成简化网格",
     ("*", "Preview Mesh"):              "预览网格",
     ("*", "Preview"):                   "预览",
-    ("*", "Discard Preview"):           "丢弃预览",
+    ("*", "Discard Preview"):           "退出预览",
     ("*", "Update Mesh"):               "更新网格",
     ("*", "Preview Envelope Weight Radius"):     "预览封套权重半径",
     ("*", "Toggle Vertex Group"):       "切换顶点组",
@@ -135,12 +135,12 @@ _ZH_HANS: dict[tuple[str, str], str] = {
 
     ("*", "Regenerate geometry of existing proxy mesh object(s) from this armature "
           "using current settings and selected bones, preserving modifiers and transforms"):
-        "使用当前设置和选中的骨骼，重新生成现有代理网格对象的几何体，并保留修改器和变换。",
+        "使用当前设置和选中的骨骼，重新生成现有简化网格对象的几何体，并保留修改器和变换。",
 
         ("*", "Generate a wireframe preview of the proxy mesh shape. "
          "No rigging or modifiers are applied. Adjust settings and preview again "
          "to iterate, then click Generate Proxy Mesh to commit."):
-    "生成代理网格形状的线框预览。不应用绑定或修改器。可反复调整设置并重新预览，确认后点击“生成代理网格”提交。",
+    "生成简化网格形状的线框预览。不应用绑定或修改器。可反复调整设置并重新预览，确认后点击“生成简化网格”提交。",
 
     ("*", "Toggle a wireframe overlay in the viewport showing the weight radius "
           "used for bone weight assignment. Radius = bone length × Weight Radius"):

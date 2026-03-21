@@ -10,7 +10,7 @@ $ManifestPath = Join-Path $ProjectRoot "blender_manifest.toml"
 
 # Read version from manifest
 $ManifestContent = Get-Content $ManifestPath -Raw
-if ($ManifestContent -match 'version\s*=\s*"([^"]+)"') {
+if ($ManifestContent -match '(?m)^version\s*=\s*"([^"]+)"') {
     $Version = $Matches[1]
 } else {
     Write-Error "Could not parse version from blender_manifest.toml"
