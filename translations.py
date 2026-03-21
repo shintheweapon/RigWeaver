@@ -137,6 +137,11 @@ _ZH_HANS: dict[tuple[str, str], str] = {
           "using current settings and selected bones, preserving modifiers and transforms"):
         "使用当前设置和选中的骨骼，重新生成现有代理网格对象的几何体，并保留修改器和变换。",
 
+        ("*", "Generate a wireframe preview of the proxy mesh shape. "
+         "No rigging or modifiers are applied. Adjust settings and preview again "
+         "to iterate, then click Generate Proxy Mesh to commit."):
+    "生成代理网格形状的线框预览。不应用绑定或修改器。可反复调整设置并重新预览，确认后点击“生成代理网格”提交。",
+
     ("*", "Toggle a wireframe overlay in the viewport showing the weight radius "
           "used for bone weight assignment. Radius = bone length × Weight Radius"):
         "在视口中切换线框叠加层，显示骨骼权重分配半径。半径 = 骨骼长度 × 权重半径",
@@ -231,6 +236,9 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     ("*", "Whether the viewport envelope radius overlay is currently displayed"):
         "控制是否在视口中显示权重半径叠加层",
 
+    ("*", "Whether the rig cage preview overlay is currently displayed"):
+        "控制是否在视口中显示绑定笼预览叠加层",
+
     ("*", "Name of the vertex group to toggle"):    "要切换的顶点组的名称",
 
     ("*", "JSON list of vertex group names active in the RigWeaver selector"):
@@ -263,6 +271,13 @@ _ZH_HANS: dict[tuple[str, str], str] = {
 
     ("*", "Sample-point triangulation for branching or irregular layouts (capes, fans)"):
         "基于采样点的三角剖分，适用于分支或不规则布局（如披风、扇形等非均匀骨骼链结构）",
+
+    ("*", "World +X is up"):          "全局 +X 轴朝上",
+    ("*", "World -X is up"):          "全局 -X 轴朝上",
+    ("*", "World +Y is up"):          "全局 +Y 轴朝上",
+    ("*", "World -Y is up"):          "全局 -Y 轴朝上",
+    ("*", "World +Z is up"):          "全局 +Z 轴朝上",
+    ("*", "World -Z is up"):          "全局 -Z 轴朝上",
 
     ("*", "Strongest weight wins"):      "取最大权重",
     ("*", "Mean of all weights"):        "取所有权重的平均值",
