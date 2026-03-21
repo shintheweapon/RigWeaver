@@ -86,7 +86,7 @@ class RigWeaverProperties(PropertyGroup):
         default=False,
     )
     mesh_triangulate: BoolProperty(
-        name="Triangulate",
+        name="Triangulate Face",
         description="Convert all quad faces to triangles in the generated mesh",
         default=False,
     )
@@ -112,7 +112,7 @@ class RigWeaverProperties(PropertyGroup):
         max=16,
     )
     mesh_row_interpolation: EnumProperty(
-        name="Longitudinal Subdivisions",
+        name="Longitudinal Interpolation",
         description=(
             "Curve shape used between bone midpoints along each chain (longitudinal direction). "
             "Has no effect when Longitudinal Subdivisions is 1."

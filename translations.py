@@ -32,8 +32,11 @@ _ZH_HANS: dict[tuple[str, str], str] = {
 
     # --- Operator labels ---
     ("*", "Generate Proxy Mesh"):       "生成代理网格",
+    ("*", "Preview Mesh"):              "预览网格",
+    ("*", "Preview"):                   "预览",
+    ("*", "Discard Preview"):           "丢弃预览",
     ("*", "Update Mesh"):               "更新网格",
-    ("*", "Preview Envelop Weight Radius"):     "预览封套权重半径",
+    ("*", "Preview Envelope Weight Radius"):     "预览封套权重半径",
     ("*", "Toggle Vertex Group"):       "切换顶点组",
     ("*", "Generate Rig"):              "生成绑定",
     ("*", "Generate Rig from Mesh"):    "从网格生成绑定",
@@ -137,6 +140,8 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     ("*", "Toggle a wireframe overlay in the viewport showing the weight radius "
           "used for bone weight assignment. Radius = bone length × Weight Radius"):
         "在视口中切换线框叠加层，显示骨骼权重分配半径。半径 = 骨骼长度 × 权重半径",
+
+    ("*", "Delete the wireframe preview mesh"):  "删除线框预览网格",
 
     ("*", "Toggle this vertex group in/out of the active selection set"):
         "将此顶点组移入选集或移出",
