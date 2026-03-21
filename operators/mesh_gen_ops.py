@@ -1529,7 +1529,6 @@ class BONE_OT_preview_proxy_mesh(Operator):
         obj.display_type = 'WIRE'
 
         bpy.ops.pose.select_all(action='DESELECT')
-        context.view_layer.objects.active = obj
         obj.select_set(True)
         self.report(
             {'INFO'},
