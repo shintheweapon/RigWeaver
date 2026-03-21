@@ -40,6 +40,7 @@ _PREVIEW_OBJ_NAME = "~RW_PREVIEW"
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _build_chains(selected: set) -> list[list]:
     """
     Decompose the selected pose-bone set into chains.
@@ -1420,7 +1421,7 @@ def _draw_envelope_circles() -> None:
 
 class BONE_OT_preview_envelope_weights(Operator):
     bl_idname = "rig_weaver.preview_envelope_weights"
-    bl_label = "Preview Weight Radius"
+    bl_label = "Preview Envelope Weight Radius"
     bl_description = (
         "Toggle a wireframe overlay in the viewport showing the weight radius "
         "used for bone weight assignment. Radius = bone length × Weight Radius"
@@ -1511,7 +1512,8 @@ class BONE_OT_preview_proxy_mesh(Operator):
             verts, faces, _, _ = result
 
         if not faces:
-            self.report({'ERROR'}, "RigWeaver: No geometry could be generated.")
+            self.report(
+                {'ERROR'}, "RigWeaver: No geometry could be generated.")
             return {'CANCELLED'}
 
         # Create or update the preview object in-place

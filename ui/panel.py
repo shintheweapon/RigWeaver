@@ -149,7 +149,7 @@ class VIEW3D_PT_rig_weaver(Panel):
                     preview_icon = 'HIDE_OFF' if props.ui_envelope_preview_active else 'HIDE_ON'
                     box.operator(
                         "rig_weaver.preview_envelope_weights",
-                        text=iface_("Preview Weight Radius"),
+                        text=iface_("Preview Envelope Weight Radius"),
                         icon=preview_icon,
                     )
 
