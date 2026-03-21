@@ -83,10 +83,14 @@ def _compute_mix_weights(
         ws = [g.weight for g in v.groups if g.group in indices]
         if not ws:
             continue
-        if   blend_mode == 'MAX':     result[v.index] = max(ws)
-        elif blend_mode == 'AVERAGE': result[v.index] = sum(ws) / len(ws)
-        elif blend_mode == 'ADD':     result[v.index] = min(sum(ws), 1.0)
-        elif blend_mode == 'MIN':     result[v.index] = min(ws)
+        if blend_mode == 'MAX':
+            result[v.index] = max(ws)
+        elif blend_mode == 'AVERAGE':
+            result[v.index] = sum(ws) / len(ws)
+        elif blend_mode == 'ADD':
+            result[v.index] = min(sum(ws), 1.0)
+        elif blend_mode == 'MIN':
+            result[v.index] = min(ws)
     # Clamp all results to the valid Blender weight range [0.0, 1.0]
     result = {vi: max(0.0, min(1.0, w)) for vi, w in result.items()}
     return result
@@ -113,7 +117,7 @@ def _write_group_weights(
 class BONE_OT_vg_toggle(Operator):
     """Toggle this vertex group in/out of the active selection set"""
     bl_idname = "rig_weaver.vg_toggle"
-    bl_label  = "Toggle Vertex Group"
+    bl_label = "Toggle Vertex Group"
     bl_options = {'REGISTER', 'UNDO'}
 
     group_name: StringProperty(  # type: ignore[valid-type]
@@ -148,8 +152,8 @@ class BONE_OT_vg_toggle(Operator):
 
 class BONE_OT_vg_select_all(Operator):
     """Select vertices in all vertex groups"""
-    bl_idname  = "rig_weaver.vg_select_all"
-    bl_label   = "All"
+    bl_idname = "rig_weaver.vg_select_all"
+    bl_label = "All"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
@@ -169,8 +173,8 @@ class BONE_OT_vg_select_all(Operator):
 
 class BONE_OT_vg_select_none(Operator):
     """Deselect all vertex groups"""
-    bl_idname  = "rig_weaver.vg_select_none"
-    bl_label   = "None"
+    bl_idname = "rig_weaver.vg_select_none"
+    bl_label = "None"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
@@ -192,8 +196,8 @@ class BONE_OT_vg_select_none(Operator):
 
 class BONE_OT_vg_preview_mix(Operator):
     """Toggle a live Weight Paint preview of the blended vertex group weights"""
-    bl_idname  = "rig_weaver.vg_preview_mix"
-    bl_label   = "Preview Mix"
+    bl_idname = "rig_weaver.vg_preview_mix"
+    bl_label = "Preview Mix"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
@@ -242,8 +246,8 @@ class BONE_OT_vg_preview_mix(Operator):
 
 class BONE_OT_vg_mix_groups(Operator):
     """Merge checked vertex groups into a single target group"""
-    bl_idname  = "rig_weaver.vg_mix_groups"
-    bl_label   = "Mix into Group"
+    bl_idname = "rig_weaver.vg_mix_groups"
+    bl_label = "Mix into Group"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
@@ -329,7 +333,7 @@ def register():
         default="Mixed",
     )
     bpy.types.Object.vg_mix_remove_srcs = BoolProperty(
-        name="Remove Source Groups",
+        name="Remove Source Groups❗",
         description="Delete the checked source groups after mixing",
         default=False,
     )
