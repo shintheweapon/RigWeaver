@@ -1280,6 +1280,8 @@ class BONE_OT_update_mesh(Operator):
             self.report({'ERROR'}, message)
             return {'CANCELLED'}
 
+        _discard_preview()
+
         source_obj = context.object
         mode = props.mesh_mode
 
