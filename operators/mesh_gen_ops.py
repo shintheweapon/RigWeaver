@@ -35,6 +35,18 @@ except ImportError:
     _NUMPY_AVAILABLE = False
 
 _PREVIEW_OBJ_NAME = "~RW_PREVIEW"
+_PREVIEW_COLLECTION_NAME = "_RW_Preview"
+
+
+def _get_or_create_preview_collection(context) -> "bpy.types.Collection":
+    """Return the dedicated preview collection, creating it if needed."""
+    coll = bpy.data.collections.get(_PREVIEW_COLLECTION_NAME)
+    if coll is None:
+        coll = bpy.data.collections.new(_PREVIEW_COLLECTION_NAME)
+    if _PREVIEW_COLLECTION_NAME not in context.scene.collection.children:
+        context.scene.collection.children.link(coll)
+    return coll
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -1525,6 +1537,11 @@ class BONE_OT_preview_proxy_mesh(Operator):
             obj = _create_mesh_object(
                 _PREVIEW_OBJ_NAME, verts, faces, source_obj, context)
             obj["rig_weaver_preview"] = True
+            # Move out of source collections into the dedicated preview collection
+            preview_coll = _get_or_create_preview_collection(context)
+            for coll in list(obj.users_collection):
+                coll.objects.unlink(obj)
+            preview_coll.objects.link(obj)
 
         obj.display_type = 'WIRE'
 
@@ -1555,6 +1572,9 @@ class BONE_OT_discard_preview_mesh(Operator):
         mesh = obj.data
         bpy.data.objects.remove(obj, do_unlink=True)
         bpy.data.meshes.remove(mesh)
+        coll = bpy.data.collections.get(_PREVIEW_COLLECTION_NAME)
+        if coll is not None and len(coll.objects) == 0:
+            bpy.data.collections.remove(coll)
         return {'FINISHED'}
 
 
