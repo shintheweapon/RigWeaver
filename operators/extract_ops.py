@@ -64,15 +64,15 @@ class RigWeaverProperties(PropertyGroup):
     mesh_mode: EnumProperty(
         name="Mode",
         items=[
-            ('INDIVIDUAL',    "Individual Strips",
+            ('INDIVIDUAL',    "Individual Strips (hair)",
              "One ribbon per chain (hair, fur, loose strands)"),
-            ('SURFACE',       "Connected Surface",
+            ('SURFACE',       "Connected Surface (plane)",
              "Panels between sorted adjacent chains (flat panels, even chain spacing)"),
-            ('SURFACE_LOOP',  "Connected Loop",
+            ('SURFACE_LOOP',  "Connected Loop (skirt)",
              "Closed surface, last chain connects back to first (skirts, rings, cylinders)"),
-            ('SURFACE_SPLIT', "Auto-Split Surface",
+            ('SURFACE_SPLIT', "Auto-Split Surface (box pleats)",
              "Connected surface with automatic gap detection (inner/outer loop layouts, box pleats)"),
-            ('TREE',          "Tree Surface",
+            ('TREE',          "Tree Surface (non-uniform chain layout)",
              "Sample-point triangulation for branching or irregular layouts (capes, fans)"),
         ],
         default='SURFACE',
@@ -91,63 +91,63 @@ class RigWeaverProperties(PropertyGroup):
         default=False,
     )
     mesh_panel_resolution: IntProperty(
-        name="V Columns",
+        name="Lateral Columns",
         description=(
-            "Number of quad columns per panel between adjacent chains (V direction). "
-            "1 = flat panel per chain, higher values produce a smoother curved profile."
+            "Quad columns per panel in the lateral direction (between adjacent "
+            "chains). 1 = single column."
         ),
         default=2,
         min=1,
         max=16,
     )
     mesh_bone_subdivisions: IntProperty(
-        name="U Subdivisions",
+        name="Longitudinal Subdivisions",
         description=(
-            "Number of subdivisions per bone segment along each chain (U direction). "
-            "1 = one row per bone, 2+ = interpolated rows for smoother length curves."
+            "Subdivisions per bone segment in the longitudinal direction (along "
+            "the chain). 1 = one row per bone, 2+ = interpolated rows within "
+            "each segment."
         ),
         default=2,
         min=1,
         max=16,
     )
     mesh_row_interpolation: EnumProperty(
-        name="U Interpolation",
+        name="Longitudinal Subdivisions",
         description=(
-            "Curve shape used between bone midpoints along each chain (U direction). "
-            "Has no effect when U Subdivisions is 1."
+            "Curve shape used between bone midpoints along each chain (longitudinal direction). "
+            "Has no effect when Longitudinal Subdivisions is 1."
         ),
         items=[
             ('LINEAR',      "Linear",
              "Straight lines between bone midpoints along the chain"),
             ('CATMULL_ROM', "Catmull-Rom",
-             "Smooth spline through bone midpoints — removes angular kinks "
+             "C1 Smooth spline through bone midpoints, removes angular kinks "
              "where bones meet"),
             ('NATURAL_CUBIC', "Natural Cubic",
-             "C2 smooth spline through chain midpoints — curvature is also "
-             "continuous along the chain for the smoothest longitudinal profile"),
+             "C2 smooth spline through chain midpoints, smoothest longitudinal profile"),
         ],
         default='LINEAR',
     )
     mesh_lateral_interpolation: EnumProperty(
-        name="V Interpolation",
+        name="Lateral Interpolation",
         description=(
-            "Curve shape used between adjacent chains (V direction — "
-            "controls the surface profile)."
+            "Curve shape used between adjacent chains (lateral direction; "
+            "controls the surface contour)."
         ),
         items=[
             ('LINEAR',        "Linear",
-             "Straight lines between adjacent chain columns — flat-sided panels"),
+             "Straight lines between adjacent chain columns, flat-sided panels"),
             ('CATMULL_ROM',   "Catmull-Rom",
-             "C1 smooth spline through all chain positions — curved cross-section "
-             "silhouette with continuous tangents"),
+             "C1 smooth spline through all chain positions, curved contour "
+             "with continuous tangents"),
             ('NATURAL_CUBIC', "Natural Cubic",
-             "C2 smooth spline — curvature is also continuous at every chain; "
-             "the mathematically smoothest possible cross-section curve"),
+             "C2 smooth spline, curvature is also continuous at every chain; "
+             "the mathematically smoothest possible contour curve"),
         ],
         default='LINEAR',
     )
     mesh_lateral_cr_strength: FloatProperty(
-        name="V Strength",
+        name="Lateral Strength",
         description=(
             "Blend between straight (Linear) and curved (spline) surface profile. "
             "0 = fully straight, 1 = full spline curvature."
@@ -206,7 +206,7 @@ class RigWeaverProperties(PropertyGroup):
     )
     mesh_generate_uvs: BoolProperty(
         name="Generate UVs",
-        description="Create a UVMap layer on the generated mesh (U=lateral, V=longitudinal)",
+        description="Create a UV Map for the generated mesh.",
         default=False,
     )
     mesh_add_subsurf: BoolProperty(
@@ -232,8 +232,8 @@ class RigWeaverProperties(PropertyGroup):
     mesh_set_parent: BoolProperty(
         name="Set as Parent",
         description=(
-            "Parent the generated mesh to the source armature so it follows "
-            "it in the outliner hierarchy. World transform is preserved."
+            "Parent the mesh to the generated armature so it follows it in "
+            "the outliner hierarchy. World transform is preserved."
         ),
         default=False,
     )
@@ -241,7 +241,8 @@ class RigWeaverProperties(PropertyGroup):
     last_weighted_bones: StringProperty(default="[]")
 
     # UI state — collapsed/expanded section headers
-    ui_expand_extract: BoolProperty(name="Extract Used Armature", default=True)
+    ui_expand_extract: BoolProperty(
+        name="Extract Deforming Bones", default=True)
     ui_expand_generate: BoolProperty(name="Generate Mesh", default=True)
 
     # UI state — envelope preview overlay active
@@ -417,7 +418,7 @@ def _find_used_parent(
 class BONE_OT_extract_used_armature(Operator):
     """Create a new armature containing only bones that have vertex weights"""
     bl_idname = "rig_weaver.extract_used_armature"
-    bl_label = "Extract Used Armature"
+    bl_label = "Extract Deforming Bones"
     bl_description = (
         "Build a reduced armature from bones that actually deform meshes. "
         "Optionally retarget mesh Armature modifiers to the new armature."

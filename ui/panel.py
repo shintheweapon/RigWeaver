@@ -59,7 +59,7 @@ class VIEW3D_PT_rig_weaver(Panel):
             icon='TRIA_DOWN' if props.ui_expand_extract else 'TRIA_RIGHT',
             icon_only=True, emboss=False,
         )
-        row.label(text=iface_("Extract Used Armature"), icon='ARMATURE_DATA')
+        row.label(text=iface_("Extract Deforming Bones"), icon='ARMATURE_DATA')
 
         if props.ui_expand_extract:
             if mode != 'OBJECT':
@@ -75,7 +75,7 @@ class VIEW3D_PT_rig_weaver(Panel):
                 row = box.row()
                 row.scale_y = 1.3
                 row.operator("rig_weaver.extract_used_armature",
-                             text=iface_("Extract Used Armature"), icon='LINKED')
+                             text=iface_("Extract Deforming Bones"), icon='LINKED')
 
         layout.separator()
 
@@ -111,7 +111,7 @@ class VIEW3D_PT_rig_weaver(Panel):
                 # U/V resolution + interpolation controls (grouped by axis)
                 if mesh_mode not in ('INDIVIDUAL', 'TREE'):
                     u_box = box.box()
-                    u_box.label(text=iface_("U (Along Chain)"))
+                    u_box.label(text=iface_("Longitudinal (Along Chain)"))
                     u_col = u_box.column()
                     u_col.use_property_split = True
                     u_col.use_property_decorate = False
@@ -119,7 +119,7 @@ class VIEW3D_PT_rig_weaver(Panel):
                     u_col.prop(props, "mesh_row_interpolation")
 
                     v_box = box.box()
-                    v_box.label(text=iface_("V (Between Chains)"))
+                    v_box.label(text=iface_("Lateral (Between Chains)"))
                     v_col = v_box.column()
                     v_col.use_property_split = True
                     v_col.use_property_decorate = False
