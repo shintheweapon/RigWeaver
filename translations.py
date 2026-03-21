@@ -55,31 +55,30 @@ _ZH_HANS: dict[tuple[str, str], str] = {
 
     # --- Mesh gen properties ---
     ("*", "Mode"):                      "模式",
-    ("*", "Longitudinal (Along Chain)"): "纵向（沿骨骼链）",
-    ("*", "Lateral (Between Chains)"):   "横向（链间）",
-    ("*", "Lateral Columns"):            "横向列数",
-    ("*", "Longitudinal Subdivisions"):  "纵向细分",
-    ("*", "Longitudinal Interpolation"): "纵向插值",
-    ("*", "Lateral Interpolation"):      "横向插值",
+    ("*", "V Columns"):                 "V方向列数",
+    ("*", "U Subdivisions"):            "U方向细分数",
+    ("*", "U Interpolation"):           "U方向插值",
+    ("*", "V Interpolation"):           "V方向插值",
     ("*", "Linear"):                    "线性",
     ("*", "Catmull-Rom"):               "Catmull-Rom 样条",
     ("*", "Natural Cubic"):             "自然三次样条",
     ("*", "Straight lines between bone midpoints along the chain"):
         "骨骼链上各骨骼中点间以直线连接",
-    ("*", "C1 Smooth spline through bone midpoints, removes angular kinks "
+    ("*", "Smooth spline through bone midpoints — removes angular kinks "
      "where bones meet"):
-        "通过骨骼中点的 C1 平滑样条，消除骨骼连接处的折角",
-    ("*", "C2 smooth spline through chain midpoints, smoothest longitudinal profile"):
-        "通过骨骼链中点的 C2 平滑样条，提供最平滑的纵向轮廓",
-    ("*", "Straight lines between adjacent chain columns, flat-sided panels"):
+        "通过骨骼中点的平滑样条，消除骨骼连接处的折角",
+    ("*", "C2 smooth spline through chain midpoints — curvature is also "
+     "continuous along the chain for the smoothest longitudinal profile"):
+        "通过骨骼链中点的 C2 平滑样条，曲率沿链连续，提供最平滑的纵向轮廓",
+    ("*", "Straight lines between adjacent chain columns — flat-sided panels"):
         "相邻骨骼链间直线连接，生成平面面板",
-    ("*", "C1 smooth spline through all chain positions, curved cross-section "
+    ("*", "C1 smooth spline through all chain positions — curved cross-section "
      "silhouette with continuous tangents"):
         "通过所有骨骼链位置的 C1 平滑样条，截面轮廓曲线且切线连续",
-    ("*", "C2 smooth spline, curvature is also continuous at every chain; "
+    ("*", "C2 smooth spline — curvature is also continuous at every chain; "
      "the mathematically smoothest possible cross-section curve"):
         "C2 平滑样条，各骨骼链位置曲率连续，数学意义上的最平滑截面曲线",
-    ("*", "Lateral Strength"):          "横向强度",
+    ("*", "V Strength"):                "V方向强度",
     ("*", "Blend between straight (Linear) and curved (spline) surface profile. "
           "0 = fully straight, 1 = full spline curvature."):
         "表面轮廓在直线（线性）与曲线（样条）之间的混合程度。0 = 完全直线，1 = 完整样条曲率。",
@@ -176,22 +175,21 @@ _ZH_HANS: dict[tuple[str, str], str] = {
     ("*", "Convert all quad faces to triangles in the generated mesh"):
         "将生成网格中的所有四边面转换为三角面",
 
-    ("*", "Quad columns per panel in the lateral direction (between adjacent "
-          "chains). 1 = single column."):
-        "每个面板横向（相邻骨骼链之间）的四边形列数，1 = 单列",
+    ("*", "Number of quad columns per panel between adjacent chains (V direction). "
+          "1 = flat panel per chain, higher values produce a smoother curved profile."):
+        "每个面板在相邻骨骼链之间（V方向）的四边形列数，1 = 单列平面面板，值越大截面轮廓越平滑",
 
-    ("*", "Subdivisions per bone segment in the longitudinal direction (along "
-          "the chain). 1 = one row per bone, 2+ = interpolated rows within "
-          "each segment."):
-        "每段骨骼纵向（沿骨骼链方向）的细分数，1 = 每段一行，2 及以上 = 段内插值多行",
+    ("*", "Number of subdivisions per bone segment along each chain (U direction). "
+          "1 = one row per bone, 2+ = interpolated rows for smoother length curves."):
+        "每段骨骼沿骨骼链（U方向）的细分数，1 = 每段一行，2 及以上 = 段内插值以获得更平滑的纵向曲线",
 
-    ("*", "Curve shape used between bone midpoints along each chain (longitudinal direction). "
-     "Has no effect when Longitudinal Subdivisions is 1."):
-        "沿每条骨骼链在骨骼中点之间使用的曲线形状（纵向）。当纵向细分为 1 时无效果。",
+    ("*", "Curve shape used between bone midpoints along each chain (U direction). "
+          "Has no effect when U Subdivisions is 1."):
+        "沿每条骨骼链在骨骼中点之间使用的曲线形状（U方向）。当 U细分数 为 1 时无效果。",
 
-    ("*", "Curve shape used between adjacent chains (lateral direction; "
-     "controls cross-section profile)."):
-        "在相邻骨骼链之间使用的曲线形状（横向；控制截面轮廓）。",
+    ("*", "Curve shape used between adjacent chains (V direction — "
+          "controls the surface profile)."):
+        "在相邻骨骼链之间使用的曲线形状（V方向 — 控制截面轮廓）。",
 
     ("*", "Width of the ribbon mesh generated from a single bone chain"):
         "单条骨骼链生成的带状网格宽度",
@@ -311,6 +309,7 @@ _ZH_HANS: dict[tuple[str, str], str] = {
         "通过 PCA 自动检测（需要 NumPy）",
 }
 
-translations_dict = {
+translations_dict: dict[str, dict] = {
+    "zh_CN":   _ZH_HANS,
     "zh_HANS": _ZH_HANS,
 }
