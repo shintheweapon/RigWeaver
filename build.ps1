@@ -17,7 +17,21 @@ if ($ManifestContent -match 'version\s*=\s*"([^"]+)"') {
     exit 1
 }
 
-$OutputName = "blender_bone_util_v$Version.zip"
+# Use manifest display name for artifact naming, normalized for filesystem safety.
+if ($ManifestContent -match 'name\s*=\s*"([^"]+)"') {
+    $AddonName = $Matches[1]
+} else {
+    $AddonName = "addon"
+}
+
+$NormalizedAddonName = $AddonName -replace '[^A-Za-z0-9]+', '_'
+$NormalizedAddonName = $NormalizedAddonName -replace '_+', '_'
+$NormalizedAddonName = $NormalizedAddonName.Trim('_')
+if ([string]::IsNullOrWhiteSpace($NormalizedAddonName)) {
+    $NormalizedAddonName = "addon"
+}
+
+$OutputName = "${NormalizedAddonName}_v$Version.zip"
 $OutputPath = Join-Path $ProjectRoot $OutputName
 
 # Remove existing zip with the same name
