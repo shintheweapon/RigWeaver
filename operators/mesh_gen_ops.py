@@ -48,6 +48,18 @@ def _get_or_create_preview_collection(context) -> "bpy.types.Collection":
     return coll
 
 
+def _discard_preview() -> None:
+    """Remove the preview object and its dedicated collection if present."""
+    obj = bpy.data.objects.get(_PREVIEW_OBJ_NAME)
+    if obj is not None:
+        mesh = obj.data
+        bpy.data.objects.remove(obj, do_unlink=True)
+        bpy.data.meshes.remove(mesh)
+    coll = bpy.data.collections.get(_PREVIEW_COLLECTION_NAME)
+    if coll is not None and len(coll.objects) == 0:
+        bpy.data.collections.remove(coll)
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -1121,6 +1133,8 @@ class BONE_OT_generate_mesh(Operator):
             self.report({'ERROR'}, message)
             return {'CANCELLED'}
 
+        _discard_preview()
+
         source_obj = context.object
         mode = props.mesh_mode
 
@@ -1566,15 +1580,9 @@ class BONE_OT_discard_preview_mesh(Operator):
         return bpy.data.objects.get(_PREVIEW_OBJ_NAME) is not None
 
     def execute(self, context):
-        obj = bpy.data.objects.get(_PREVIEW_OBJ_NAME)
-        if obj is None:
+        if bpy.data.objects.get(_PREVIEW_OBJ_NAME) is None:
             return {'CANCELLED'}
-        mesh = obj.data
-        bpy.data.objects.remove(obj, do_unlink=True)
-        bpy.data.meshes.remove(mesh)
-        coll = bpy.data.collections.get(_PREVIEW_COLLECTION_NAME)
-        if coll is not None and len(coll.objects) == 0:
-            bpy.data.collections.remove(coll)
+        _discard_preview()
         return {'FINISHED'}
 
 
