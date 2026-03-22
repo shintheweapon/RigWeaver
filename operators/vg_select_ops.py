@@ -306,6 +306,12 @@ classes = (
 )
 
 
+def _vg_mix_target_search(self, context, edit_text):
+    """Suggest existing vertex group names; does not enforce membership."""
+    return [vg.name for vg in self.vertex_groups
+            if edit_text.lower() in vg.name.lower()]
+
+
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
@@ -331,6 +337,7 @@ def register():
         name="Target Group",
         description="Name for the new merged vertex group",
         default="Mixed",
+        search=_vg_mix_target_search,
     )
     bpy.types.Object.vg_mix_remove_srcs = BoolProperty(
         name="Remove Source Groups❗",
