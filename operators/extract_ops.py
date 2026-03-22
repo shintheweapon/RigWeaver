@@ -438,13 +438,11 @@ class BONE_OT_extract_used_armature(Operator):
         props = context.scene.rig_weaver_props
 
         # --- Determine used bone names ---
-        # Reuse cached result if available, otherwise re-analyse
-        cached = json.loads(props.last_weighted_bones)
-        if cached:
-            used_names: set[str] = set(cached)
-        else:
-            used_names = _collect_weighted_names(source_obj)
-            props.last_weighted_bones = json.dumps(sorted(used_names))
+        # Always re-analyse so the result reflects the current vertex-weight state.
+        # (A stale cached value would silently omit bones that gained weights since
+        # the last run, causing them to be skipped during extraction.)
+        used_names = _collect_weighted_names(source_obj)
+        props.last_weighted_bones = json.dumps(sorted(used_names))
 
         if not used_names:
             self.report(
@@ -460,17 +458,10 @@ class BONE_OT_extract_used_armature(Operator):
                 {'ERROR'}, "RigWeaver: No matching bones found in armature.")
             return {'CANCELLED'}
 
-        # --- Build parent name map and topo-sorted list BEFORE any mode switches ---
-        # bpy.types.Bone references become stale after mode_set(); snapshot as
-        # plain Python strings now so helpers never touch live Blender data later.
-        parent_name_map: dict[str, str | None] = {
-            b.name: b.parent.name if b.parent else None
-            for b in source_obj.data.bones
-        }
-        ordered = _topo_sort(used_names, parent_name_map)
-
         # --- Snapshot source edit-bone data ---
         # Must enter Edit Mode on source to read edit_bones (roll is only on EditBone).
+        # parent_name_map is also built here from edit_bones so both data structures
+        # share the same data source and are guaranteed consistent.
         bpy.ops.object.select_all(action='DESELECT')
         source_obj.select_set(True)
         context.view_layer.objects.active = source_obj
@@ -478,6 +469,36 @@ class BONE_OT_extract_used_armature(Operator):
             self.report(
                 {'ERROR'}, "RigWeaver: Could not enter Edit Mode on source armature.")
             return {'CANCELLED'}
+
+        # Build parent map from ALL edit bones (not just weighted ones) so that
+        # _find_used_parent can walk through non-weighted intermediates correctly.
+        parent_name_map: dict[str, str | None] = {
+            eb.name: eb.parent.name if eb.parent else None
+            for eb in source_obj.data.edit_bones
+        }
+
+        # Pre-compute each deforming bone's nearest deforming ancestor as a plain
+        # string — resolved entirely before any new-armature edit bones exist, so
+        # there are no Blender wrapper references that could go stale later.
+        final_parent_map: dict[str, str | None] = {
+            name: _find_used_parent(name, parent_name_map, used_names)
+            for name in used_names
+        }
+
+        # Iterative topological sort over the collapsed hierarchy (BFS).
+        # final_parent_map already has no non-deforming intermediates, so a
+        # simple BFS from roots is sufficient. Using BFS instead of the
+        # recursive _topo_sort avoids hitting Python's recursion limit for
+        # deeply nested armatures (chains longer than ~1000 deforming bones).
+        _children: dict[str, list[str]] = {n: [] for n in final_parent_map}
+        for _bname, _bpar in final_parent_map.items():
+            if _bpar is not None:
+                _children[_bpar].append(_bname)
+        ordered: list[str] = [n for n, p in final_parent_map.items() if p is None]
+        _i = 0
+        while _i < len(ordered):
+            ordered.extend(_children[ordered[_i]])
+            _i += 1
 
         source_edit_data: dict[str, dict] = {}
         for name in ordered:
@@ -522,7 +543,7 @@ class BONE_OT_extract_used_armature(Operator):
                 {'ERROR'}, "RigWeaver: Could not enter Edit Mode on new armature.")
             return {'CANCELLED'}
 
-        new_bone_map: dict[str, bpy.types.EditBone] = {}
+        created_names: set[str] = set()
 
         for name in ordered:
             data = source_edit_data.get(name)
@@ -534,20 +555,20 @@ class BONE_OT_extract_used_armature(Operator):
             new_eb.tail = data['tail']
             new_eb.roll = data['roll']
 
-            # Find nearest weighted ancestor (may skip non-weighted intermediates)
+            # Assign parent using the pre-computed final_parent_map (plain strings)
+            # and a live edit_bones lookup — avoids any stale Python wrapper issue
+            # that can arise when new bones are added to the collection.
             direct_parent = data['parent_name']
-            used_parent = _find_used_parent(name, parent_name_map, used_names)
-            if used_parent and used_parent in new_bone_map:
-                new_eb.parent = new_bone_map[used_parent]
-                if props.connect_child_bones:
-                    # Force all children to connect to their parent, regardless of
-                    # whether intermediates were skipped or the source flag value
-                    new_eb.use_connect = True
-                elif used_parent == direct_parent:
-                    # Option off, no intermediates skipped — preserve source flag
-                    new_eb.use_connect = data['use_connect']
+            used_parent = final_parent_map.get(name)
+            if used_parent and used_parent in created_names:
+                new_eb.parent = new_arm_data.edit_bones[used_parent]
+                if used_parent == direct_parent:
+                    # No intermediates skipped — honour connect_child_bones normally
+                    new_eb.use_connect = True if props.connect_child_bones else data['use_connect']
                 else:
-                    # Option off, intermediates skipped — leave gap (default)
+                    # Intermediates were skipped. Snapping the head to a distant
+                    # ancestor's tail would place the bone at the wrong position,
+                    # so always leave a gap regardless of connect_child_bones.
                     new_eb.use_connect = False
             else:
                 new_eb.use_connect = False
@@ -555,7 +576,7 @@ class BONE_OT_extract_used_armature(Operator):
             # NOTE: edit_bone.collections is deliberately NOT accessed here.
             # Any access (len, iteration) triggers a C-level crash in Blender 4.5.
 
-            new_bone_map[name] = new_eb
+            created_names.add(name)
 
         # --- Auto bone orientation (optional) ---
         # Matches Blender FBX import "Automatic Bone Orientation".
@@ -570,7 +591,7 @@ class BONE_OT_extract_used_armature(Operator):
                     children_map.setdefault(eb.parent, []).append(eb)
 
             # Step 1: non-end bones
-            for name, new_eb in new_bone_map.items():
+            for new_eb in new_arm_data.edit_bones:
                 children = children_map.get(new_eb, [])
                 if not children:
                     continue
@@ -583,7 +604,7 @@ class BONE_OT_extract_used_armature(Operator):
                     new_eb.tail = new_eb.head + direction.normalized() * bone_len
 
             # Step 2: end bones — inherit parent's already-corrected direction
-            for name, new_eb in new_bone_map.items():
+            for new_eb in new_arm_data.edit_bones:
                 children = children_map.get(new_eb, [])
                 if children or not new_eb.parent:
                     continue  # not an end bone, or no parent to inherit from
@@ -608,7 +629,7 @@ class BONE_OT_extract_used_armature(Operator):
         new_obj.select_set(True)
         context.view_layer.objects.active = new_obj
 
-        bone_count = len(new_bone_map)
+        bone_count = len(created_names)
         self.report(
             {'INFO'}, f"RigWeaver: Created '{new_obj.name}' with {bone_count} bone(s).")
 
