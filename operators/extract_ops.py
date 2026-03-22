@@ -561,10 +561,21 @@ class BONE_OT_extract_used_armature(Operator):
             direct_parent = data['parent_name']
             used_parent = final_parent_map.get(name)
             if used_parent and used_parent in created_names:
-                new_eb.parent = new_arm_data.edit_bones[used_parent]
+                parent_eb = new_arm_data.edit_bones[used_parent]
+                new_eb.parent = parent_eb
                 if used_parent == direct_parent:
-                    # No intermediates skipped — honour connect_child_bones normally
-                    new_eb.use_connect = True if props.connect_child_bones else data['use_connect']
+                    # No intermediates skipped — honour connect_child_bones normally.
+                    should_connect = props.connect_child_bones or data['use_connect']
+                    if should_connect:
+                        # Blender-style connect: snap parent's tail to child's head
+                        # BEFORE setting use_connect. Without this, Blender enforces
+                        # the constraint by moving the child's head to the parent's
+                        # tail instead — the opposite direction from the UI Connect
+                        # operation, causing the bone to appear at a wrong position.
+                        parent_eb.tail = new_eb.head
+                        new_eb.use_connect = True
+                    else:
+                        new_eb.use_connect = False
                 else:
                     # Intermediates were skipped. Snapping the head to a distant
                     # ancestor's tail would place the bone at the wrong position,
