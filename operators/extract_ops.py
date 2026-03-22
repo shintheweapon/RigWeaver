@@ -55,9 +55,10 @@ class RigWeaverProperties(PropertyGroup):
     connect_child_bones: BoolProperty(
         name="Connect Child Bones",
         description=(
-            "Snap every child bone's head to its parent's tail in the reduced "
-            "armature, forming a continuous connected chain regardless of whether "
-            "intermediate bones were skipped"
+            "Connect child bones to their parents in the reduced armature. "
+            "Each parent's tail snaps to the child's head, matching Blender's "
+            "own Connect operation so bone positions are preserved. Bones whose "
+            "direct parent was skipped are left unconnected to avoid wrong positions"
         ),
         default=False,
     )

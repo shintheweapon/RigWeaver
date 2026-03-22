@@ -171,10 +171,13 @@ _ZH_HANS: dict[tuple[str, str], str] = {
           "aligns with global +Z (same as FBX import 'Automatic Bone Orientation')"):
         "重新计算精简骨架上的骨骼滚动角，使局部 Z 轴与全局 +Z 对齐（与 FBX 导入的“自动骨骼朝向”同效）",
 
-    ("*", "Snap every child bone's head to its parent's tail in the reduced "
-          "armature, forming a continuous connected chain regardless of whether "
-          "intermediate bones were skipped"):
-        "将精简骨架中每块子骨骼的头部吸附至父骨骼的尾部，无论是否跳过了中间骨骼，都会形成连续的骨骼链",
+    ("*", "Connect child bones to their parents in the reduced armature. "
+          "Each parent's tail snaps to the child's head, matching Blender's "
+          "own Connect operation so bone positions are preserved. Bones whose "
+          "direct parent was skipped are left unconnected to avoid wrong positions"):
+        "将精简骨架中的子骨骼连接至其父骨骼。每块父骨骼的尾部将吸附至子骨骼的头部"
+        "（与 Blender 自身的连接操作一致），从而保留骨骼位置。"
+        "直接父骨骼被跳过的骨骼将保持未连接状态，以避免位置错误",
 
     ("*", "Create one mesh object per chain instead of merging all ribbons into "
           "a single object (only active when Individual Chains is on)"):
