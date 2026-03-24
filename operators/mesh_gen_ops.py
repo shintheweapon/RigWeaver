@@ -1480,6 +1480,52 @@ class BONE_OT_preview_envelope_weights(Operator):
         return {'FINISHED'}
 
 
+def _run_preview(context) -> None:
+    """Silently regenerate ~RW_PREVIEW if it already exists.
+
+    Called from property update= callbacks.  Never creates the preview object —
+    only updates an existing one.  All errors are swallowed so that a bad
+    context (wrong mode, no selection, etc.) never shows a popup.
+    """
+    try:
+        existing = bpy.data.objects.get(_PREVIEW_OBJ_NAME)
+        if existing is None or existing.type != 'MESH':
+            return
+
+        props = context.scene.rig_weaver_props
+        selected = set(context.selected_pose_bones)   # AttributeError if not POSE
+        chains = _build_chains(selected)
+        if not chains:
+            return
+
+        msg = _mesh_numpy_requirement_message(props, len(chains))
+        if msg and not _NUMPY_AVAILABLE:
+            return
+
+        if len(chains) == 1:
+            verts: list[Vector] = []
+            faces: list[tuple[int, ...]] = []
+            _ribbon_from_chain(
+                chains[0], props.mesh_ribbon_width,
+                props.mesh_bone_subdivisions, verts, faces, None,
+            )
+            if props.mesh_triangulate:
+                faces = _triangulate_faces(faces)
+        else:
+            result = _build_geometry(props, chains)
+            if result is None:
+                return
+            verts, faces, _, _ = result
+
+        if not faces:
+            return
+
+        _replace_mesh_data(existing, verts, faces)
+        existing.display_type = 'WIRE'
+    except Exception:
+        return
+
+
 class BONE_OT_preview_proxy_mesh(Operator):
     """Preview proxy mesh shape as wireframe — no rigging or modifiers applied"""
     bl_idname = "rig_weaver.preview_proxy_mesh"
