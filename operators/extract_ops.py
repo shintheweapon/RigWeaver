@@ -35,6 +35,14 @@ def _on_auto_rig_update(self, context):
         mesh_gen_ops.deactivate_envelope_preview(self, context)
 
 
+def _on_mesh_prop_update(self, context):
+    """Live-regenerate ~RW_PREVIEW when a geometry-affecting property changes."""
+    if bpy.data.objects.get("~RW_PREVIEW") is None:
+        return
+    from . import mesh_gen_ops
+    mesh_gen_ops._run_preview(context)
+
+
 class RigWeaverProperties(PropertyGroup):
     retarget_meshes: BoolProperty(
         name="Retarget Meshes",
@@ -77,6 +85,7 @@ class RigWeaverProperties(PropertyGroup):
              "Sample-point triangulation for branching or irregular layouts (capes, fans)"),
         ],
         default='SURFACE',
+        update=_on_mesh_prop_update,
     )
     mesh_split_objects: BoolProperty(
         name="Separate Objects",
@@ -90,6 +99,7 @@ class RigWeaverProperties(PropertyGroup):
         name="Triangulate Face",
         description="Convert all quad faces to triangles in the generated mesh",
         default=False,
+        update=_on_mesh_prop_update,
     )
     mesh_panel_resolution: IntProperty(
         name="Lateral Columns",
@@ -100,6 +110,7 @@ class RigWeaverProperties(PropertyGroup):
         default=2,
         min=1,
         max=16,
+        update=_on_mesh_prop_update,
     )
     mesh_bone_subdivisions: IntProperty(
         name="Longitudinal Subdivisions",
@@ -111,6 +122,7 @@ class RigWeaverProperties(PropertyGroup):
         default=2,
         min=1,
         max=16,
+        update=_on_mesh_prop_update,
     )
     mesh_row_interpolation: EnumProperty(
         name="Longitudinal Interpolation",
@@ -128,6 +140,7 @@ class RigWeaverProperties(PropertyGroup):
              "C2 smooth spline through chain midpoints, smoothest longitudinal profile"),
         ],
         default='LINEAR',
+        update=_on_mesh_prop_update,
     )
     mesh_lateral_interpolation: EnumProperty(
         name="Lateral Interpolation",
@@ -146,6 +159,7 @@ class RigWeaverProperties(PropertyGroup):
              "the mathematically smoothest possible contour curve"),
         ],
         default='LINEAR',
+        update=_on_mesh_prop_update,
     )
     mesh_lateral_cr_strength: FloatProperty(
         name="Lateral Strength",
@@ -156,6 +170,7 @@ class RigWeaverProperties(PropertyGroup):
         default=1.0,
         min=0.0,
         max=1.0,
+        update=_on_mesh_prop_update,
     )
     mesh_ribbon_width: FloatProperty(
         name="Ribbon Width",
@@ -164,6 +179,7 @@ class RigWeaverProperties(PropertyGroup):
         min=0.001,
         soft_max=1.0,
         unit='LENGTH',
+        update=_on_mesh_prop_update,
     )
     mesh_strip_gap_factor: FloatProperty(
         name="Gap Factor",
@@ -174,6 +190,7 @@ class RigWeaverProperties(PropertyGroup):
         default=2.0,
         min=1.1,
         soft_max=10.0,
+        update=_on_mesh_prop_update,
     )
     mesh_tree_alpha_factor: FloatProperty(
         name="Bridge Filter",
@@ -184,6 +201,7 @@ class RigWeaverProperties(PropertyGroup):
         default=2.0,
         min=0.1,
         soft_max=10.0,
+        update=_on_mesh_prop_update,
     )
     mesh_envelope_factor: FloatProperty(
         name="Weight Radius",
