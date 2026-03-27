@@ -211,26 +211,54 @@ def _compute_rig_bone_positions(
 
 _rig_preview_handle = None   # SpaceView3D draw handler
 _rig_preview_lines: list[tuple] = []   # flat (head_xyz, tail_xyz) pairs
+_rig_preview_tris:  list[tuple] = []   # arrowhead triangle verts (6 per bone)
 
 
 def _update_rig_preview_cache(context) -> None:
-    """Recompute bone line pairs and tag all VIEW_3D areas for redraw."""
-    global _rig_preview_lines
+    """Recompute bone line pairs, arrowhead triangles, and tag VIEW_3D areas."""
+    global _rig_preview_lines, _rig_preview_tris
     obj = context.object
     props = context.scene.rig_weaver_props
 
     if obj is None or obj.type != 'MESH':
         _rig_preview_lines = []
+        _rig_preview_tris  = []
     else:
         bone_levels = _compute_rig_bone_positions(obj, props)
         if bone_levels is None:
             _rig_preview_lines = []
+            _rig_preview_tris  = []
         else:
             lines = []
+            tris  = []
+            _up_z = Vector((0.0, 0.0, 1.0))
+            _up_y = Vector((0.0, 1.0, 0.0))
             for chain in bone_levels:
                 for li in range(len(chain) - 1):
-                    lines.append((chain[li].to_tuple(), chain[li + 1].to_tuple()))
+                    head = chain[li]
+                    tail = chain[li + 1]
+                    lines.append((head.to_tuple(), tail.to_tuple()))
+
+                    d = tail - head
+                    bone_len = d.length
+                    if bone_len < 1e-6:
+                        continue
+                    d = d / bone_len
+                    scale = bone_len * 0.28
+
+                    up = _up_y if abs(d.dot(_up_z)) > 0.9 else _up_z
+                    perp1 = d.cross(up).normalized()
+                    perp2 = d.cross(perp1).normalized()
+
+                    base = tail - d * (scale * 0.7)
+                    tip  = tail.to_tuple()
+                    for perp in (perp1, perp2):
+                        tris += [tip,
+                                 (base + perp * (scale * 0.4)).to_tuple(),
+                                 (base - perp * (scale * 0.4)).to_tuple()]
+
             _rig_preview_lines = lines
+            _rig_preview_tris  = tris
 
     for area in context.screen.areas:
         if area.type == 'VIEW_3D':
@@ -256,6 +284,12 @@ def _draw_rig_preview() -> None:
     gpu.state.line_width_set(2.0)
     batch = batch_for_shader(shader, 'LINES', {"pos": line_verts})
     batch.draw(shader)
+
+    # ── Arrowheads (green filled triangles at each bone tail) ────────────────
+    if _rig_preview_tris:
+        shader.uniform_float("color", (0.2, 0.9, 0.4, 0.75))
+        batch = batch_for_shader(shader, 'TRIS', {"pos": _rig_preview_tris})
+        batch.draw(shader)
 
     # ── Envelope circles (orange) — only when Assign Weights is on ──────────
     try:
