@@ -30,13 +30,16 @@ def _load_selected(obj) -> set[str]:
 # Core selection helper
 # ---------------------------------------------------------------------------
 
-def _apply_vg_selection(obj: bpy.types.Object) -> None:
+def _apply_vg_selection(obj: bpy.types.Object) -> bool:
     """
     Set Edit Mode vertex selection to exactly the checked vertex groups.
 
     A vertex is selected iff it belongs to at least one group whose name is
     in the JSON set stored on obj.vg_selected_groups.
     Requires obj to be a MESH in EDIT mode.
+
+    Returns True if vertex weight data was found, False if the mesh has no
+    deform layer (caller may want to warn the user in that case).
     """
     selected_names: set[str] = _load_selected(obj)
     selected_indices: set[int] = {
@@ -49,14 +52,16 @@ def _apply_vg_selection(obj: bpy.types.Object) -> None:
     bm = bmesh.from_edit_mesh(me)
     deform_layer = bm.verts.layers.deform.active
 
+    if deform_layer is None:
+        bmesh.update_edit_mesh(me, loop_triangles=False, destructive=False)
+        return False
+
     for vert in bm.verts:
-        vert.select = (
-            deform_layer is not None
-            and any(gi in selected_indices for gi in vert[deform_layer].keys())
-        )
+        vert.select = any(gi in selected_indices for gi in vert[deform_layer].keys())
 
     bm.select_flush_mode()
     bmesh.update_edit_mesh(me, loop_triangles=False, destructive=False)
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -142,7 +147,8 @@ class BONE_OT_vg_toggle(Operator):
             selected.add(self.group_name)
 
         obj.vg_selected_groups = json.dumps(sorted(selected))
-        _apply_vg_selection(obj)
+        if not _apply_vg_selection(obj):
+            self.report({'WARNING'}, "RigWeaver: No vertex weight data on this mesh.")
         return {'FINISHED'}
 
 
@@ -167,7 +173,8 @@ class BONE_OT_vg_select_all(Operator):
         obj.vg_selected_groups = json.dumps(
             sorted(vg.name for vg in obj.vertex_groups)
         )
-        _apply_vg_selection(obj)
+        if not _apply_vg_selection(obj):
+            self.report({'WARNING'}, "RigWeaver: No vertex weight data on this mesh.")
         return {'FINISHED'}
 
 

@@ -681,7 +681,7 @@ classes = (
 @persistent
 def _on_load_post_rig_preview(_filepath):
     """Clear stale rig preview draw handler when a new file is loaded."""
-    global _rig_preview_handle, _rig_preview_lines
+    global _rig_preview_handle, _rig_preview_lines, _rig_preview_tris
     if _rig_preview_handle is not None:
         try:
             bpy.types.SpaceView3D.draw_handler_remove(_rig_preview_handle, 'WINDOW')
@@ -689,6 +689,7 @@ def _on_load_post_rig_preview(_filepath):
             pass
         _rig_preview_handle = None
     _rig_preview_lines = []
+    _rig_preview_tris  = []
     try:
         bpy.context.scene.rig_weaver_props.ui_rig_preview_active = False
     except Exception:
