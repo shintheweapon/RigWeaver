@@ -36,6 +36,7 @@ except ImportError:
 
 _PREVIEW_OBJ_NAME = "~RW_PREVIEW"
 _PREVIEW_COLLECTION_NAME = "_RW_Preview"
+_last_geometry_error: str = ""   # set by _tree_surface_mesh; read by callers
 
 
 def _get_or_create_preview_collection(context) -> "bpy.types.Collection":
@@ -833,11 +834,18 @@ def _tree_surface_mesh(
        alpha_factor × median edge length.
     5. Emit to vert_list / face_list.
     """
+    global _last_geometry_error
+    _last_geometry_error = ""
+
     pts3d: list[Vector] = []
     for chain in chains:
         pts3d.extend(_chain_levels(chain, subdivisions))
 
     if len(pts3d) < 3:
+        _last_geometry_error = (
+            f"Tree mode needs at least 3 sample points "
+            f"({len(pts3d)} found). Add more chains or increase Subdivisions."
+        )
         return
 
     arr = _np.array([(v.x, v.y, v.z) for v in pts3d], dtype=float)
@@ -848,6 +856,10 @@ def _tree_surface_mesh(
 
     tris = _bowyer_watson(pts2d)
     if not tris:
+        _last_geometry_error = (
+            "Tree mode triangulation produced no triangles. "
+            "Sample points may be collinear or degenerate."
+        )
         return
 
     edge_lengths = []
@@ -857,12 +869,17 @@ def _tree_surface_mesh(
             dy = pts2d[a][1] - pts2d[b][1]
             edge_lengths.append(math.hypot(dx, dy))
     if not edge_lengths:
+        _last_geometry_error = "Tree mode produced no valid edges (degenerate geometry)."
         return
     median_edge = sorted(edge_lengths)[len(edge_lengths) // 2]
     alpha = alpha_factor * median_edge
 
     tris = _alpha_filter(pts2d, tris, alpha)
     if not tris:
+        _last_geometry_error = (
+            f"Bridge Filter removed all triangles "
+            f"(factor {alpha_factor:.2f}). Try a higher Bridge Filter value."
+        )
         return
 
     if uv_list is not None:
@@ -1025,6 +1042,8 @@ def _build_geometry(
             chains_used.extend(strip)
 
     elif mode == 'TREE':
+        global _last_geometry_error
+        _last_geometry_error = ""
         _tree_surface_mesh(
             chains, props.mesh_bone_subdivisions, props.mesh_tree_alpha_factor,
             all_verts, all_faces, all_uvs,
@@ -1208,8 +1227,8 @@ class BONE_OT_generate_mesh(Operator):
         # ------------------------------------------------------------------
         result = _build_geometry(props, chains)
         if result is None:
-            self.report(
-                {'ERROR'}, "RigWeaver: No geometry could be generated.")
+            msg = _last_geometry_error or "No geometry could be generated."
+            self.report({'ERROR'}, f"RigWeaver: {msg}")
             return {'CANCELLED'}
         all_verts, all_faces, all_uvs, chains_used = result
 
@@ -1345,8 +1364,8 @@ class BONE_OT_update_mesh(Operator):
 
         result = _build_geometry(props, chains)
         if result is None:
-            self.report(
-                {'ERROR'}, "RigWeaver: No geometry could be generated.")
+            msg = _last_geometry_error or "No geometry could be generated."
+            self.report({'ERROR'}, f"RigWeaver: {msg}")
             return {'CANCELLED'}
         all_verts, all_faces, all_uvs, chains_used = result
 
@@ -1580,8 +1599,8 @@ class BONE_OT_preview_proxy_mesh(Operator):
         else:
             result = _build_geometry(props, chains)
             if result is None:
-                self.report(
-                    {'ERROR'}, "RigWeaver: No geometry could be generated.")
+                msg = _last_geometry_error or "No geometry could be generated."
+                self.report({'ERROR'}, f"RigWeaver: {msg}")
                 return {'CANCELLED'}
             verts, faces, _, _ = result
 
@@ -1658,6 +1677,10 @@ def _on_load_post_envelope_preview(_filepath):
         except Exception:
             pass
         _envelope_draw_handle = None
+    try:
+        _discard_preview()
+    except Exception:
+        pass
     try:
         bpy.context.scene.rig_weaver_props.ui_envelope_preview_active = False
     except Exception:
