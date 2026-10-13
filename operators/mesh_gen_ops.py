@@ -276,24 +276,56 @@ def _cr_col(
     depth: int,
     use_loop: bool,
 ) -> "list[Vector]":
-    """Sample the global Catmull-Rom spline through all chain columns at global_t.
+    """
+    Sample the global Catmull-Rom spline through all chain columns at global_t.
 
-    Chain i is at integer parameter i.  global_t may be fractional (e.g. i + 0.5
-    for the midpoint between chains i and i+1).  For close_loop the chain index
-    wraps modulo N; for open surfaces it clamps to the first/last chain.
+    Chain i is at integer parameter i. For a loop the chain index wraps
+    modulo N. For an open surface the segment is clamped to the first or last
+    pair of chains, so a global_t past either end extrapolates along the end
+    segment; the control point past each end is the end chain mirrored
+    through its neighbour (2 * end - neighbour).
+
+    Parameters
+    ----------
+    all_levels : list of list of mathutils.Vector
+        Row positions of each chain, in chain order.
+    N : int
+        Number of chains, at least 2.
+    global_t : float
+        Spline parameter; may be fractional (e.g. i + 0.5 for the midpoint
+        between chains i and i+1) or outside [0, N - 1] for an open surface.
+    depth : int
+        Number of rows to sample.
+    use_loop : bool
+        Treat the chains as a closed loop.
+
+    Returns
+    -------
+    list of mathutils.Vector
+        One position per row.
     """
     s = int(math.floor(global_t))
-    lt = global_t - s
     if use_loop:
-        def ci(k: int) -> int: return k % N
+        lt = global_t - s
+
+        def point(k: int, d: int) -> Vector:
+            return _pos(all_levels[k % N], d)
     else:
-        def ci(k: int) -> int: return max(0, min(k, N - 1))
+        s = max(0, min(s, N - 2))
+        lt = global_t - s
+
+        def point(k: int, d: int) -> Vector:
+            if k < 0:
+                return 2.0 * _pos(all_levels[0], d) - _pos(all_levels[1], d)
+            if k > N - 1:
+                return 2.0 * _pos(all_levels[N - 1], d) - _pos(all_levels[N - 2], d)
+            return _pos(all_levels[k], d)
     return [
         _catmull_rom_point(
-            _pos(all_levels[ci(s - 1)], d),
-            _pos(all_levels[ci(s)],     d),
-            _pos(all_levels[ci(s + 1)], d),
-            _pos(all_levels[ci(s + 2)], d),
+            point(s - 1, d),
+            point(s, d),
+            point(s + 1, d),
+            point(s + 2, d),
             lt,
         )
         for d in range(depth)
@@ -345,13 +377,29 @@ def _nc_eval(
     M_np: "_np.ndarray",
     use_loop: bool,
 ) -> "_np.ndarray":
-    """Evaluate the natural cubic spline at global_t.
+    """
+    Evaluate the natural cubic spline at global_t.
 
-    Uses the pre-computed second derivatives M_np from _solve_nc_spline_M.
-    For LOOP mode indices wrap modulo N; for open surfaces the nearest end
-    segment is used, allowing cubic extrapolation at outer panel boundaries.
+    For a loop, indices wrap modulo N. For an open surface the nearest end
+    segment is used, and the position along it is taken after clamping, so a
+    global_t past either end extrapolates along that segment (outer panel
+    boundaries).
 
-    Returns a numpy (3,) position array.
+    Parameters
+    ----------
+    global_t : float
+        Spline parameter; chain i is at i.
+    pts_np : numpy.ndarray
+        (N, 3) chain positions at one row depth.
+    M_np : numpy.ndarray
+        (N, 3) second derivatives from ``_solve_nc_spline_M``.
+    use_loop : bool
+        Treat the chains as a closed loop.
+
+    Returns
+    -------
+    numpy.ndarray
+        The (3,) position.
     """
     N = len(pts_np)
     s = int(math.floor(global_t))
@@ -362,6 +410,7 @@ def _nc_eval(
         m0, m1 = M_np[s],   M_np[(s + 1) % N]
     else:
         s = max(0, min(s, N - 2))
+        lt = global_t - s
         p0, p1 = pts_np[s], pts_np[s + 1]
         m0, m1 = M_np[s],   M_np[s + 1]
     b = (p1 - p0) - (2.0 * m0 + m1) / 6.0

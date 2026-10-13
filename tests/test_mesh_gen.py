@@ -1,9 +1,10 @@
-# Tests for Generate Proxy Mesh: placement in world space
+# Tests for Generate Proxy Mesh: world placement, welded panels, spline edges
 
 import math
 import unittest
 
 import bpy
+import numpy as np
 from mathutils import Vector
 
 from blender_bone_util.operators import mesh_gen_ops
@@ -220,6 +221,57 @@ class WeldedSurfaceTest(unittest.TestCase):
                     spans.append(max(us) - min(us))
                 self.assertLess(max(spans), 0.5)
                 self.assertAlmostEqual(max(uv[li].uv.x for li in range(len(uv))), 1.0, places=5)
+
+
+def lateral_samplers(points):
+    """
+    Return the open-surface lateral splines through ``points``, one row deep.
+
+    Returns
+    -------
+    dict of str to callable
+        'NATURAL_CUBIC' and 'CATMULL_ROM', each mapping a parameter t to a
+        position (chain i is at t = i).
+    """
+    pts = np.array([list(p) for p in points], dtype=float)
+    second = mesh_gen_ops._solve_nc_spline_M(pts, False)
+    levels = [[p] for p in points]
+    n = len(points)
+    return {
+        'NATURAL_CUBIC': lambda t: Vector(mesh_gen_ops._nc_eval(t, pts, second, False)),
+        'CATMULL_ROM': lambda t: mesh_gen_ops._cr_col(levels, n, t, 1, False)[0],
+    }
+
+
+class SplineEdgeTest(unittest.TestCase):
+    """The smooth lateral splines extend half a step past the outer chains."""
+
+    def test_straight_chains_extend_half_a_step(self):
+        points = [Vector((float(x), 0.0, 0.0)) for x in range(4)]
+        for name, sample in lateral_samplers(points).items():
+            with self.subTest(spline=name):
+                self.assertAlmostEqual(sample(-0.5).x, -0.5, places=6)
+                self.assertAlmostEqual(sample(3.5).x, 3.5, places=6)
+                for i, p in enumerate(points):
+                    self.assertLess((sample(float(i)) - p).length, 1e-6)
+
+    def test_two_chains_extend_half_a_step(self):
+        points = [Vector((0.0, 0.0, 0.0)), Vector((1.0, 0.0, 0.0))]
+        for name, sample in lateral_samplers(points).items():
+            with self.subTest(spline=name):
+                self.assertAlmostEqual(sample(-0.5).x, -0.5, places=6)
+                self.assertAlmostEqual(sample(1.5).x, 1.5, places=6)
+
+    def test_columns_on_an_arc_keep_their_order(self):
+        points = [Vector((math.cos(a), math.sin(a), 0.0)) for a in (0.0, 0.6, 1.2, 1.8)]
+        # Panel columns as _cross_section_mesh samples them, resolution 2
+        ts = [i - 0.5 + s / 4 for i in range(4) for s in range(4)] + [3.5]
+        for name, sample in lateral_samplers(points).items():
+            with self.subTest(spline=name):
+                cols = [sample(t) for t in ts]
+                steps = [b - a for a, b in zip(cols, cols[1:])]
+                for a, b in zip(steps, steps[1:]):
+                    self.assertGreater(a.dot(b), 0.0)
 
 
 if __name__ == '__main__':
