@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "rig_weaver"
-version = "0.1.0"
+version = "0.2.0"
 name = "RigWeaver"
 tagline = "Bone extraction and simulation proxy mesh tools"
 maintainer = "theweapon"
@@ -11,4 +11,4 @@ blender_version_min = "4.5.0"
 
 license = ["SPDX:GPL-3.0-or-later"]
 
-tags = ["Rigging", "Armature"]
+tags = ["Rigging"]

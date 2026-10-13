@@ -12,6 +12,7 @@ for chains of unequal length.
 from __future__ import annotations
 
 import math
+from types import SimpleNamespace
 
 from mathutils import Matrix, Vector
 
@@ -95,6 +96,43 @@ def _build_chains(selected: set) -> list[list]:
             chains.append(chain)
 
     return chains
+
+
+def _world_chains(chains: list[list], matrix_world: Matrix) -> list[list]:
+    """
+    Copy pose-bone chains into world space.
+
+    Pose bone positions are in armature space; the generated mesh sits at the
+    world origin, so every position the geometry code reads is moved into
+    world space here.
+
+    Parameters
+    ----------
+    chains : list of list of bpy.types.PoseBone
+        Chains from ``_build_chains``.
+    matrix_world : mathutils.Matrix
+        The armature object's world matrix.
+
+    Returns
+    -------
+    list of list of types.SimpleNamespace
+        The same chains, each bone with ``name``, ``parent``, ``head``,
+        ``tail`` (world positions) and ``x_axis`` (unit world direction).
+    """
+    rotation = matrix_world.to_3x3()
+    return [
+        [
+            SimpleNamespace(
+                name=pb.name,
+                parent=pb.parent,
+                head=matrix_world @ pb.head,
+                tail=matrix_world @ pb.tail,
+                x_axis=(rotation @ pb.x_axis).normalized(),
+            )
+            for pb in chain
+        ]
+        for chain in chains
+    ]
 
 
 def _sort_chains(chains: list[list], parent_bone) -> list[list]:
@@ -238,24 +276,56 @@ def _cr_col(
     depth: int,
     use_loop: bool,
 ) -> "list[Vector]":
-    """Sample the global Catmull-Rom spline through all chain columns at global_t.
+    """
+    Sample the global Catmull-Rom spline through all chain columns at global_t.
 
-    Chain i is at integer parameter i.  global_t may be fractional (e.g. i + 0.5
-    for the midpoint between chains i and i+1).  For close_loop the chain index
-    wraps modulo N; for open surfaces it clamps to the first/last chain.
+    Chain i is at integer parameter i. For a loop the chain index wraps
+    modulo N. For an open surface the segment is clamped to the first or last
+    pair of chains, so a global_t past either end extrapolates along the end
+    segment; the control point past each end is the end chain mirrored
+    through its neighbour (2 * end - neighbour).
+
+    Parameters
+    ----------
+    all_levels : list of list of mathutils.Vector
+        Row positions of each chain, in chain order.
+    N : int
+        Number of chains, at least 2.
+    global_t : float
+        Spline parameter; may be fractional (e.g. i + 0.5 for the midpoint
+        between chains i and i+1) or outside [0, N - 1] for an open surface.
+    depth : int
+        Number of rows to sample.
+    use_loop : bool
+        Treat the chains as a closed loop.
+
+    Returns
+    -------
+    list of mathutils.Vector
+        One position per row.
     """
     s = int(math.floor(global_t))
-    lt = global_t - s
     if use_loop:
-        def ci(k: int) -> int: return k % N
+        lt = global_t - s
+
+        def point(k: int, d: int) -> Vector:
+            return _pos(all_levels[k % N], d)
     else:
-        def ci(k: int) -> int: return max(0, min(k, N - 1))
+        s = max(0, min(s, N - 2))
+        lt = global_t - s
+
+        def point(k: int, d: int) -> Vector:
+            if k < 0:
+                return 2.0 * _pos(all_levels[0], d) - _pos(all_levels[1], d)
+            if k > N - 1:
+                return 2.0 * _pos(all_levels[N - 1], d) - _pos(all_levels[N - 2], d)
+            return _pos(all_levels[k], d)
     return [
         _catmull_rom_point(
-            _pos(all_levels[ci(s - 1)], d),
-            _pos(all_levels[ci(s)],     d),
-            _pos(all_levels[ci(s + 1)], d),
-            _pos(all_levels[ci(s + 2)], d),
+            point(s - 1, d),
+            point(s, d),
+            point(s + 1, d),
+            point(s + 2, d),
             lt,
         )
         for d in range(depth)
@@ -307,13 +377,29 @@ def _nc_eval(
     M_np: "_np.ndarray",
     use_loop: bool,
 ) -> "_np.ndarray":
-    """Evaluate the natural cubic spline at global_t.
+    """
+    Evaluate the natural cubic spline at global_t.
 
-    Uses the pre-computed second derivatives M_np from _solve_nc_spline_M.
-    For LOOP mode indices wrap modulo N; for open surfaces the nearest end
-    segment is used, allowing cubic extrapolation at outer panel boundaries.
+    For a loop, indices wrap modulo N. For an open surface the nearest end
+    segment is used, and the position along it is taken after clamping, so a
+    global_t past either end extrapolates along that segment (outer panel
+    boundaries).
 
-    Returns a numpy (3,) position array.
+    Parameters
+    ----------
+    global_t : float
+        Spline parameter; chain i is at i.
+    pts_np : numpy.ndarray
+        (N, 3) chain positions at one row depth.
+    M_np : numpy.ndarray
+        (N, 3) second derivatives from ``_solve_nc_spline_M``.
+    use_loop : bool
+        Treat the chains as a closed loop.
+
+    Returns
+    -------
+    numpy.ndarray
+        The (3,) position.
     """
     N = len(pts_np)
     s = int(math.floor(global_t))
@@ -324,6 +410,7 @@ def _nc_eval(
         m0, m1 = M_np[s],   M_np[(s + 1) % N]
     else:
         s = max(0, min(s, N - 2))
+        lt = global_t - s
         p0, p1 = pts_np[s], pts_np[s + 1]
         m0, m1 = M_np[s],   M_np[s + 1]
     b = (p1 - p0) - (2.0 * m0 + m1) / 6.0
@@ -514,14 +601,31 @@ def _fill_columns(
     vert_list: list[Vector],
     face_list: list[tuple[int, ...]],
     uv_list: list[tuple[float, float]] | None = None,
+    close_loop: bool = False,
 ) -> None:
     """
     Build vertices and faces for a sequence of level-columns.
 
-    all_columns: ordered list of level-position lists (first = left real chain,
-                 last = right real chain, middle = interpolated).
-    real_len_left / real_len_right: bone-count of the two bounding real chains,
-        used to determine dropout depth for each column.
+    Adjacent columns of different lengths are joined by a triangle where the
+    shorter one ends (graduated dropout).
+
+    Parameters
+    ----------
+    all_columns : list of list of mathutils.Vector
+        Ordered level-position lists, one per column.
+    real_len_left, real_len_right : int
+        Bone counts of the two bounding real chains (not used).
+    vert_list : list of mathutils.Vector
+        Receives the vertices, one per column position.
+    face_list : list of tuple of int
+        Receives the faces, as indices into ``vert_list``.
+    uv_list : list of tuple of float, optional
+        Receives one (u, v) per vertex: u runs across the columns and v down
+        the longest column.
+    close_loop : bool, optional
+        Also join the last column back to the first. u then runs from 0 at the
+        first column to (n - 1) / n at the last, and the closing faces need
+        ``_assign_uvs(..., wrap_u=True)``.
     """
     n_cols = len(all_columns)
     max_depth = max(len(c) for c in all_columns)
@@ -529,16 +633,17 @@ def _fill_columns(
     # Build local vertex map: (col_idx, depth) → index in vert_list
     col_vert_map: dict[tuple[int, int], int] = {}
     for ci, col in enumerate(all_columns):
-        u = ci / max(n_cols - 1, 1)
+        u = ci / n_cols if close_loop else ci / max(n_cols - 1, 1)
         for d, pos in enumerate(col):
             col_vert_map[(ci, d)] = len(vert_list)
             vert_list.append(pos)
             if uv_list is not None:
                 uv_list.append((u, d / max(max_depth - 1, 1)))
 
-    for ci in range(n_cols - 1):
+    for ci in range(n_cols if close_loop else n_cols - 1):
+        nxt = (ci + 1) % n_cols
         len_left = len(all_columns[ci])
-        len_right = len(all_columns[ci + 1])
+        len_right = len(all_columns[nxt])
 
         for d in range(max_depth):
             l_curr = d <= len_left - 1
@@ -553,20 +658,20 @@ def _fill_columns(
                 face_list.append((
                     col_vert_map[(ci, d)],
                     col_vert_map[(ci, d + 1)],
-                    col_vert_map[(ci + 1, d + 1)],
-                    col_vert_map[(ci + 1, d)],
+                    col_vert_map[(nxt, d + 1)],
+                    col_vert_map[(nxt, d)],
                 ))
             elif l_next:
                 face_list.append((
                     col_vert_map[(ci, d)],
                     col_vert_map[(ci, d + 1)],
-                    col_vert_map[(ci + 1, d)],
+                    col_vert_map[(nxt, d)],
                 ))
             elif r_next:
                 face_list.append((
                     col_vert_map[(ci, d)],
-                    col_vert_map[(ci + 1, d + 1)],
-                    col_vert_map[(ci + 1, d)],
+                    col_vert_map[(nxt, d + 1)],
+                    col_vert_map[(nxt, d)],
                 ))
 
 
@@ -591,14 +696,33 @@ def _cross_section_mesh(
     chains (vs N-1 in an edge-aligned scheme) and each bone runs through the
     centre of its panel — matching the single-chain ribbon behaviour.
 
-    close_loop:          connect last chain back to first (cylindrical surfaces, N≥3).
-    resolution:          quad columns per panel in the lateral direction.
-    subdivisions:        row subdivisions per bone segment in the longitudinal direction.
-    row_interp:          interpolation along each chain
-                         ('LINEAR', 'CATMULL_ROM', or 'NATURAL_CUBIC').
-    lateral_interp:      interpolation across adjacent chains
-                         ('LINEAR', 'CATMULL_ROM', or 'NATURAL_CUBIC').
-    lateral_cr_strength: blend factor for smooth lateral modes (0=linear, 1=full spline).
+    Adjacent panels share their boundary vertices, so the strip is one piece.
+
+    Parameters
+    ----------
+    chains : list of list
+        Bone chains, sorted by adjacency; each bone has ``head`` and ``tail``.
+    close_loop : bool
+        Connect the last chain back to the first (cylindrical surfaces). Takes
+        effect with 3 or more chains.
+    resolution : int
+        Quad columns per panel in the lateral direction.
+    vert_list : list of mathutils.Vector
+        Receives the vertices.
+    face_list : list of tuple of int
+        Receives the faces, as indices into ``vert_list``.
+    subdivisions : int, optional
+        Row subdivisions per bone segment in the longitudinal direction.
+    uv_list : list of tuple of float, optional
+        Receives one (u, v) per vertex; see ``_fill_columns``.
+    row_interp : str, optional
+        Interpolation along each chain: 'LINEAR', 'CATMULL_ROM' or
+        'NATURAL_CUBIC'.
+    lateral_interp : str, optional
+        Interpolation across adjacent chains: 'LINEAR', 'CATMULL_ROM' or
+        'NATURAL_CUBIC'.
+    lateral_cr_strength : float, optional
+        Blend factor for the smooth lateral modes (0 = linear, 1 = full spline).
     """
     N = len(chains)
     all_levels = [_chain_levels(c, subdivisions, row_interp) for c in chains]
@@ -645,6 +769,7 @@ def _cross_section_mesh(
             for d in range(depth)
         ]
 
+    strip_columns: list[list[Vector]] = []
     for i in range(N):
         depth = len(all_levels[i])
         # exact chain position — always a vertex
@@ -707,10 +832,23 @@ def _cross_section_mesh(
             right_interp = _interpolate_levels(
                 center_col, right_col,  resolution)
 
-        all_columns = [left_col] + left_interp + \
-            [center_col] + right_interp + [right_col]
-        _fill_columns(all_columns, len(chains[i]), len(
-            chains[i]), vert_list, face_list, uv_list)
+        # Panel i's left boundary holds the same positions as panel i-1's
+        # right boundary; keep one column (the longer) so the panels share
+        # vertices instead of leaving a seam.
+        if strip_columns:
+            if len(left_col) > len(strip_columns[-1]):
+                strip_columns[-1] = left_col
+        else:
+            strip_columns.append(left_col)
+        strip_columns += left_interp + [center_col] + right_interp + [right_col]
+
+    if use_loop:
+        # The last right boundary is the first left boundary
+        closing = strip_columns.pop()
+        if len(closing) > len(strip_columns[0]):
+            strip_columns[0] = closing
+    _fill_columns(strip_columns, len(chains[0]), len(chains[-1]),
+                  vert_list, face_list, uv_list, close_loop=use_loop)
 
 
 # ---------------------------------------------------------------------------
@@ -953,11 +1091,32 @@ def _create_mesh_object(
 def _assign_uvs(
     mesh_obj: "bpy.types.Object",
     uv_list: list[tuple[float, float]],
+    wrap_u: bool = False,
 ) -> None:
-    """Assign per-vertex UV coordinates to a newly created mesh object."""
-    uv_layer = mesh_obj.data.uv_layers.new(name="UVMap")
-    for loop in mesh_obj.data.loops:
-        uv_layer.data[loop.index].uv = uv_list[loop.vertex_index]
+    """
+    Assign per-vertex UV coordinates to a newly created mesh object.
+
+    Parameters
+    ----------
+    mesh_obj : bpy.types.Object
+        The mesh object; a "UVMap" layer is added to its mesh.
+    uv_list : list of tuple of float
+        One (u, v) per vertex, by vertex index.
+    wrap_u : bool, optional
+        The mesh is a closed loop whose first column has u = 0. A face whose u
+        values span more than 0.5 crosses that seam, so its corners with
+        u < 0.5 get u + 1 and the face runs up to u = 1.
+    """
+    mesh = mesh_obj.data
+    uv_layer = mesh.uv_layers.new(name="UVMap")
+    for poly in mesh.polygons:
+        loop_indices = range(poly.loop_start, poly.loop_start + poly.loop_total)
+        uvs = [uv_list[mesh.loops[li].vertex_index] for li in loop_indices]
+        us = [u for u, _ in uvs]
+        if wrap_u and max(us) - min(us) > 0.5:
+            uvs = [(u + 1.0 if u < 0.5 else u, v) for u, v in uvs]
+        for li, uv in zip(loop_indices, uvs):
+            uv_layer.data[li].uv = uv
 
 
 # ---------------------------------------------------------------------------
@@ -1099,7 +1258,10 @@ def _apply_post_processing(
     if props.mesh_add_subsurf:
         _apply_subsurf(obj, props.mesh_subsurf_levels)
     if uvs:
-        _assign_uvs(obj, uvs)
+        # Only a Connected Loop of 3 or more chains is closed (see use_loop
+        # in _cross_section_mesh)
+        _assign_uvs(obj, uvs, wrap_u=(
+            props.mesh_mode == 'SURFACE_LOOP' and len(chains_used) >= 3))
     if props.mesh_auto_rig:
         _assign_bone_vertex_groups(
             obj, verts, chains_used, props.mesh_envelope_factor)
@@ -1142,7 +1304,8 @@ class BONE_OT_generate_mesh(Operator):
         props = context.scene.rig_weaver_props
 
         selected = set(context.selected_pose_bones)
-        chains = _build_chains(selected)
+        chains = _world_chains(
+            _build_chains(selected), context.object.matrix_world)
         if not chains:
             self.report({'ERROR'}, "RigWeaver: No chains found in selection.")
             return {'CANCELLED'}
@@ -1289,7 +1452,8 @@ class BONE_OT_update_mesh(Operator):
         props = context.scene.rig_weaver_props
 
         selected = set(context.selected_pose_bones)
-        chains = _build_chains(selected)
+        chains = _world_chains(
+            _build_chains(selected), context.object.matrix_world)
         if not chains:
             self.report({'ERROR'}, "RigWeaver: No chains found in selection.")
             return {'CANCELLED'}
@@ -1513,7 +1677,8 @@ def _run_preview(context) -> None:
 
         props = context.scene.rig_weaver_props
         selected = set(context.selected_pose_bones)   # AttributeError if not POSE
-        chains = _build_chains(selected)
+        chains = _world_chains(
+            _build_chains(selected), context.object.matrix_world)
         if not chains:
             return
 
@@ -1576,7 +1741,8 @@ class BONE_OT_preview_proxy_mesh(Operator):
     def execute(self, context):
         props = context.scene.rig_weaver_props
         selected = set(context.selected_pose_bones)
-        chains = _build_chains(selected)
+        chains = _world_chains(
+            _build_chains(selected), context.object.matrix_world)
         if not chains:
             self.report({'ERROR'}, "RigWeaver: No chains found in selection.")
             return {'CANCELLED'}

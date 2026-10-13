@@ -580,6 +580,8 @@ class BONE_OT_update_rig_from_mesh(Operator):
             self.report({'ERROR'}, "RigWeaver: No tagged armature found for this mesh.")
             return {'CANCELLED'}
         arm_data = arm_obj.data
+        # Bone names before the rebuild, so only their vertex groups are replaced
+        old_bone_names = {b.name for b in arm_data.bones}
 
         # ── Enter Edit Mode and rebuild bones ─────────────────────────────────
         bpy.ops.object.select_all(action='DESELECT')
@@ -634,7 +636,14 @@ class BONE_OT_update_rig_from_mesh(Operator):
 
         # ── Re-assign weights if enabled ──────────────────────────────────────
         if props.rig_auto_weights:
-            mesh_obj.vertex_groups.clear()
+            # Replace the groups of the old and new bones only; other groups
+            # (e.g. a cloth pin group) stay. Same-name groups go too, since
+            # re-assignment would leave their stale weights behind.
+            bone_names = old_bone_names | {
+                name for chain in all_bone_name_chains for name in chain}
+            for name in bone_names:
+                if name in mesh_obj.vertex_groups:
+                    mesh_obj.vertex_groups.remove(mesh_obj.vertex_groups[name])
             from . import mesh_gen_ops
             mesh_gen_ops._assign_bone_vertex_groups(
                 mesh_obj, verts_world, all_bone_proxy_chains, props.rig_envelope_factor,
