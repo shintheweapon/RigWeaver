@@ -12,6 +12,7 @@ for chains of unequal length.
 from __future__ import annotations
 
 import math
+from types import SimpleNamespace
 
 from mathutils import Matrix, Vector
 
@@ -95,6 +96,43 @@ def _build_chains(selected: set) -> list[list]:
             chains.append(chain)
 
     return chains
+
+
+def _world_chains(chains: list[list], matrix_world: Matrix) -> list[list]:
+    """
+    Copy pose-bone chains into world space.
+
+    Pose bone positions are in armature space; the generated mesh sits at the
+    world origin, so every position the geometry code reads is moved into
+    world space here.
+
+    Parameters
+    ----------
+    chains : list of list of bpy.types.PoseBone
+        Chains from ``_build_chains``.
+    matrix_world : mathutils.Matrix
+        The armature object's world matrix.
+
+    Returns
+    -------
+    list of list of types.SimpleNamespace
+        The same chains, each bone with ``name``, ``parent``, ``head``,
+        ``tail`` (world positions) and ``x_axis`` (unit world direction).
+    """
+    rotation = matrix_world.to_3x3()
+    return [
+        [
+            SimpleNamespace(
+                name=pb.name,
+                parent=pb.parent,
+                head=matrix_world @ pb.head,
+                tail=matrix_world @ pb.tail,
+                x_axis=(rotation @ pb.x_axis).normalized(),
+            )
+            for pb in chain
+        ]
+        for chain in chains
+    ]
 
 
 def _sort_chains(chains: list[list], parent_bone) -> list[list]:
@@ -1142,7 +1180,8 @@ class BONE_OT_generate_mesh(Operator):
         props = context.scene.rig_weaver_props
 
         selected = set(context.selected_pose_bones)
-        chains = _build_chains(selected)
+        chains = _world_chains(
+            _build_chains(selected), context.object.matrix_world)
         if not chains:
             self.report({'ERROR'}, "RigWeaver: No chains found in selection.")
             return {'CANCELLED'}
@@ -1289,7 +1328,8 @@ class BONE_OT_update_mesh(Operator):
         props = context.scene.rig_weaver_props
 
         selected = set(context.selected_pose_bones)
-        chains = _build_chains(selected)
+        chains = _world_chains(
+            _build_chains(selected), context.object.matrix_world)
         if not chains:
             self.report({'ERROR'}, "RigWeaver: No chains found in selection.")
             return {'CANCELLED'}
@@ -1513,7 +1553,8 @@ def _run_preview(context) -> None:
 
         props = context.scene.rig_weaver_props
         selected = set(context.selected_pose_bones)   # AttributeError if not POSE
-        chains = _build_chains(selected)
+        chains = _world_chains(
+            _build_chains(selected), context.object.matrix_world)
         if not chains:
             return
 
@@ -1576,7 +1617,8 @@ class BONE_OT_preview_proxy_mesh(Operator):
     def execute(self, context):
         props = context.scene.rig_weaver_props
         selected = set(context.selected_pose_bones)
-        chains = _build_chains(selected)
+        chains = _world_chains(
+            _build_chains(selected), context.object.matrix_world)
         if not chains:
             self.report({'ERROR'}, "RigWeaver: No chains found in selection.")
             return {'CANCELLED'}
