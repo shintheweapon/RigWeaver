@@ -20,6 +20,7 @@ if "bpy" in locals():
     importlib.reload(operators.mesh_gen_ops)
     importlib.reload(operators.rig_from_mesh_ops)
     importlib.reload(operators.vg_select_ops)
+    importlib.reload(operators.weight_transfer_ops)
     importlib.reload(operators)
     importlib.reload(ui.panel)
     importlib.reload(ui)
