@@ -329,6 +329,32 @@ _ZH_HANS: dict[tuple[str, str], str] = {
 
     ("*", "Detect automatically via PCA (requires NumPy)"):
         "通过 PCA 自动检测（需要 NumPy）",
+
+    # -----------------------------------------------------------------------
+    # Transfer Weights (terms Blender already translates use Blender's words)
+    # -----------------------------------------------------------------------
+    ("*", "Transfer Weights"):              "传递权重",
+    ("*", "Source"):                        "源",
+    ("*", "Vertex Mapping"):                "顶点映射",
+    ("*", "Normalize Weights"):             "规格化权重",
+    ("*", "Add Armature Modifier"):         "添加骨架修改器",
+
+    ("*", "Mesh whose deform bone weights are copied to the active mesh"):
+        "将其形变骨骼权重复制到当前激活网格的源网格",
+
+    ("*", "How each target vertex finds its source weights"):
+        "每个目标顶点获取源权重的方式",
+
+    ("*", "Make the copied bone weights of each vertex add up to 1"):
+        "使每个顶点复制得到的骨骼权重之和为 1",
+
+    ("*", "Point an Armature modifier on the active mesh at the source's armature, "
+          "reusing one that already does"):
+        "让当前激活网格上的骨架修改器指向源网格的骨架（已有指向该骨架的修改器时直接沿用）",
+
+    ("*", "Copy the source mesh's deform bone weights to the active mesh, matched by "
+          "group name. Other groups on the active mesh are kept."):
+        "将源网格的形变骨骼权重按组名复制到当前激活网格，激活网格上的其他顶点组保持不变。",
 }
 
 translations_dict: dict[str, dict] = {

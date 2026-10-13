@@ -95,6 +95,19 @@ Result:
 
 - Quickly combines multiple groups into one target group.
 
+#### E. Transfer Weights (Mesh, Object Mode)
+
+1. Select the mesh that should receive the weights (Object Mode).
+2. In `RigWeaver > Transfer Weights`, set:
+   - `Source`: a mesh deformed by an armature (Armature modifier or armature parent)
+   - `Vertex Mapping` (default `Nearest Face Interpolated`)
+   - optional `Normalize Weights`, `Add Armature Modifier`
+3. Click `Transfer Weights`.
+
+Result:
+
+- The active mesh receives the source's deform bone weights, matched by group name, from the source's rest shape. Other groups on the active mesh (e.g. a pin group) are kept.
+
 ### 4. GIF Walkthrough Slots (docs/media)
 
 #### Proxy Preview -> Generate Cycle
@@ -119,6 +132,7 @@ Result:
 - `Generate Mesh` / `Preview Mesh` / `Update Mesh`: Armature in Pose Mode with selected pose bones.
 - `Generate Rig from Mesh`: active object must be Mesh in Object Mode.
 - `Vertex Group Select`: Mesh in Edit Mode or Weight Paint Mode.
+- `Transfer Weights`: active object must be Mesh in Object Mode; the source must be another mesh deformed by an armature.
 
 ### 6. NumPy/GPU Notes
 
@@ -139,7 +153,8 @@ Result:
 │  ├─ extract_ops.py
 │  ├─ mesh_gen_ops.py
 │  ├─ rig_from_mesh_ops.py
-│  └─ vg_select_ops.py
+│  ├─ vg_select_ops.py
+│  └─ weight_transfer_ops.py
 ├─ tests/
 │  ├─ run_tests.py
 │  └─ test_*.py
@@ -233,6 +248,19 @@ Result:
 
 - 快速将多个顶点组混合到目标组。
 
+#### E. 传递权重（网格对象，物体模式）
+
+1. 选中要接收权重的网格（物体模式）。
+2. 在 `RigWeaver > 传递权重` 设置：
+   - `源`：由骨架变形的网格（骨架修改器或骨架父级）
+   - `顶点映射`（默认 `最近的面插值`）
+   - 可选 `规格化权重`、`添加骨架修改器`
+3. 点击 `传递权重`。
+
+结果：
+
+- 当前激活网格按组名获得源网格的形变骨骼权重（取自源网格的静止形状）。激活网格上的其他顶点组（如固定组）保持不变。
+
 ### 4. GIF 演示
 
 将文件放入下列路径后，README 会自动显示。
@@ -259,6 +287,7 @@ Result:
 - `生成网格` / `预览网格` / `更新网格`：骨架对象 + 姿态模式 + 已选骨骼。
 - `从网格生成绑定`：激活对象为网格，且在物体模式。
 - `顶点组选择`：网格对象，编辑模式或权重绘制模式。
+- `传递权重`：激活对象为网格，且在物体模式；源须是另一个由骨架变形的网格。
 
 ### 6. NumPy/GPU 说明
 
@@ -279,7 +308,8 @@ Result:
 │  ├─ extract_ops.py
 │  ├─ mesh_gen_ops.py
 │  ├─ rig_from_mesh_ops.py
-│  └─ vg_select_ops.py
+│  ├─ vg_select_ops.py
+│  └─ weight_transfer_ops.py
 ├─ tests/
 │  ├─ run_tests.py
 │  └─ test_*.py
