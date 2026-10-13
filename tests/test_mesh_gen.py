@@ -132,5 +132,95 @@ class WorldSpaceTest(unittest.TestCase):
         self.assertGreater(moved, 0.05)
 
 
+def piece_count(obj):
+    """
+    Count the connected pieces of a mesh object.
+
+    Returns
+    -------
+    int
+        The number of groups of vertices linked by edges.
+    """
+    links = {v.index: set() for v in obj.data.vertices}
+    for e in obj.data.edges:
+        a, b = e.vertices
+        links[a].add(b)
+        links[b].add(a)
+    seen = set()
+    pieces = 0
+    for start in links:
+        if start in seen:
+            continue
+        pieces += 1
+        stack = [start]
+        while stack:
+            vi = stack.pop()
+            if vi not in seen:
+                seen.add(vi)
+                stack.extend(links[vi] - seen)
+    return pieces
+
+
+def euler_characteristic(obj):
+    """Return vertex count minus edge count plus face count: 1 for a sheet, 0 for an open tube."""
+    me = obj.data
+    return len(me.vertices) - len(me.edges) + len(me.polygons)
+
+
+LATERAL_MODES = ('LINEAR', 'CATMULL_ROM', 'NATURAL_CUBIC')
+
+
+class WeldedSurfaceTest(unittest.TestCase):
+    """Connected Surface and Connected Loop give one piece."""
+
+    def setUp(self):
+        new_scene()
+
+    def generate_each_lateral_mode(self, chains, **settings):
+        """Yield (lateral mode, generated object) for every lateral interpolation."""
+        arm_obj = armature_with_chains(chains)
+        for lateral in LATERAL_MODES:
+            # Generate leaves the new mesh active and the bones deselected
+            bpy.context.view_layer.objects.active = arm_obj
+            for bone in arm_obj.data.bones:
+                bone.select = bone.name != "root"
+            obj = generate(mesh_lateral_interpolation=lateral, mesh_auto_rig=False, **settings)
+            yield lateral, obj
+
+    def test_surface_is_one_sheet(self):
+        chains = [(-0.5, 0.0, 2), (0.0, 0.0, 2), (0.5, 0.0, 2)]
+        for lateral, obj in self.generate_each_lateral_mode(chains, mesh_mode='SURFACE'):
+            with self.subTest(lateral=lateral):
+                self.assertEqual(piece_count(obj), 1)
+                self.assertEqual(euler_characteristic(obj), 1)
+
+    def test_unequal_chains_are_one_piece(self):
+        chains = [(-0.5, 0.0, 3), (0.0, 0.0, 1), (0.5, 0.0, 2), (1.0, 0.0, 3)]
+        for lateral, obj in self.generate_each_lateral_mode(chains, mesh_mode='SURFACE'):
+            with self.subTest(lateral=lateral):
+                self.assertEqual(piece_count(obj), 1)
+                self.assertTrue(any(len(p.vertices) == 3 for p in obj.data.polygons))
+
+    def test_loop_is_one_open_tube(self):
+        chains = [(math.cos(a), math.sin(a), 2) for a in (0, math.pi / 2, math.pi, 1.5 * math.pi)]
+        for lateral, obj in self.generate_each_lateral_mode(chains, mesh_mode='SURFACE_LOOP'):
+            with self.subTest(lateral=lateral):
+                self.assertEqual(piece_count(obj), 1)
+                self.assertEqual(euler_characteristic(obj), 0)
+
+    def test_loop_uvs_cross_the_seam_once(self):
+        chains = [(math.cos(a), math.sin(a), 2) for a in (0, math.pi / 2, math.pi, 1.5 * math.pi)]
+        for lateral, obj in self.generate_each_lateral_mode(
+                chains, mesh_mode='SURFACE_LOOP', mesh_generate_uvs=True):
+            with self.subTest(lateral=lateral):
+                uv = obj.data.uv_layers["UVMap"].data
+                spans = []
+                for p in obj.data.polygons:
+                    us = [uv[li].uv.x for li in p.loop_indices]
+                    spans.append(max(us) - min(us))
+                self.assertLess(max(spans), 0.5)
+                self.assertAlmostEqual(max(uv[li].uv.x for li in range(len(uv))), 1.0, places=5)
+
+
 if __name__ == '__main__':
     unittest.main()

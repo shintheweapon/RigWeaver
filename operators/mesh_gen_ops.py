@@ -552,14 +552,31 @@ def _fill_columns(
     vert_list: list[Vector],
     face_list: list[tuple[int, ...]],
     uv_list: list[tuple[float, float]] | None = None,
+    close_loop: bool = False,
 ) -> None:
     """
     Build vertices and faces for a sequence of level-columns.
 
-    all_columns: ordered list of level-position lists (first = left real chain,
-                 last = right real chain, middle = interpolated).
-    real_len_left / real_len_right: bone-count of the two bounding real chains,
-        used to determine dropout depth for each column.
+    Adjacent columns of different lengths are joined by a triangle where the
+    shorter one ends (graduated dropout).
+
+    Parameters
+    ----------
+    all_columns : list of list of mathutils.Vector
+        Ordered level-position lists, one per column.
+    real_len_left, real_len_right : int
+        Bone counts of the two bounding real chains (not used).
+    vert_list : list of mathutils.Vector
+        Receives the vertices, one per column position.
+    face_list : list of tuple of int
+        Receives the faces, as indices into ``vert_list``.
+    uv_list : list of tuple of float, optional
+        Receives one (u, v) per vertex: u runs across the columns and v down
+        the longest column.
+    close_loop : bool, optional
+        Also join the last column back to the first. u then runs from 0 at the
+        first column to (n - 1) / n at the last, and the closing faces need
+        ``_assign_uvs(..., wrap_u=True)``.
     """
     n_cols = len(all_columns)
     max_depth = max(len(c) for c in all_columns)
@@ -567,16 +584,17 @@ def _fill_columns(
     # Build local vertex map: (col_idx, depth) → index in vert_list
     col_vert_map: dict[tuple[int, int], int] = {}
     for ci, col in enumerate(all_columns):
-        u = ci / max(n_cols - 1, 1)
+        u = ci / n_cols if close_loop else ci / max(n_cols - 1, 1)
         for d, pos in enumerate(col):
             col_vert_map[(ci, d)] = len(vert_list)
             vert_list.append(pos)
             if uv_list is not None:
                 uv_list.append((u, d / max(max_depth - 1, 1)))
 
-    for ci in range(n_cols - 1):
+    for ci in range(n_cols if close_loop else n_cols - 1):
+        nxt = (ci + 1) % n_cols
         len_left = len(all_columns[ci])
-        len_right = len(all_columns[ci + 1])
+        len_right = len(all_columns[nxt])
 
         for d in range(max_depth):
             l_curr = d <= len_left - 1
@@ -591,20 +609,20 @@ def _fill_columns(
                 face_list.append((
                     col_vert_map[(ci, d)],
                     col_vert_map[(ci, d + 1)],
-                    col_vert_map[(ci + 1, d + 1)],
-                    col_vert_map[(ci + 1, d)],
+                    col_vert_map[(nxt, d + 1)],
+                    col_vert_map[(nxt, d)],
                 ))
             elif l_next:
                 face_list.append((
                     col_vert_map[(ci, d)],
                     col_vert_map[(ci, d + 1)],
-                    col_vert_map[(ci + 1, d)],
+                    col_vert_map[(nxt, d)],
                 ))
             elif r_next:
                 face_list.append((
                     col_vert_map[(ci, d)],
-                    col_vert_map[(ci + 1, d + 1)],
-                    col_vert_map[(ci + 1, d)],
+                    col_vert_map[(nxt, d + 1)],
+                    col_vert_map[(nxt, d)],
                 ))
 
 
@@ -629,14 +647,33 @@ def _cross_section_mesh(
     chains (vs N-1 in an edge-aligned scheme) and each bone runs through the
     centre of its panel — matching the single-chain ribbon behaviour.
 
-    close_loop:          connect last chain back to first (cylindrical surfaces, N≥3).
-    resolution:          quad columns per panel in the lateral direction.
-    subdivisions:        row subdivisions per bone segment in the longitudinal direction.
-    row_interp:          interpolation along each chain
-                         ('LINEAR', 'CATMULL_ROM', or 'NATURAL_CUBIC').
-    lateral_interp:      interpolation across adjacent chains
-                         ('LINEAR', 'CATMULL_ROM', or 'NATURAL_CUBIC').
-    lateral_cr_strength: blend factor for smooth lateral modes (0=linear, 1=full spline).
+    Adjacent panels share their boundary vertices, so the strip is one piece.
+
+    Parameters
+    ----------
+    chains : list of list
+        Bone chains, sorted by adjacency; each bone has ``head`` and ``tail``.
+    close_loop : bool
+        Connect the last chain back to the first (cylindrical surfaces). Takes
+        effect with 3 or more chains.
+    resolution : int
+        Quad columns per panel in the lateral direction.
+    vert_list : list of mathutils.Vector
+        Receives the vertices.
+    face_list : list of tuple of int
+        Receives the faces, as indices into ``vert_list``.
+    subdivisions : int, optional
+        Row subdivisions per bone segment in the longitudinal direction.
+    uv_list : list of tuple of float, optional
+        Receives one (u, v) per vertex; see ``_fill_columns``.
+    row_interp : str, optional
+        Interpolation along each chain: 'LINEAR', 'CATMULL_ROM' or
+        'NATURAL_CUBIC'.
+    lateral_interp : str, optional
+        Interpolation across adjacent chains: 'LINEAR', 'CATMULL_ROM' or
+        'NATURAL_CUBIC'.
+    lateral_cr_strength : float, optional
+        Blend factor for the smooth lateral modes (0 = linear, 1 = full spline).
     """
     N = len(chains)
     all_levels = [_chain_levels(c, subdivisions, row_interp) for c in chains]
@@ -683,6 +720,7 @@ def _cross_section_mesh(
             for d in range(depth)
         ]
 
+    strip_columns: list[list[Vector]] = []
     for i in range(N):
         depth = len(all_levels[i])
         # exact chain position — always a vertex
@@ -745,10 +783,23 @@ def _cross_section_mesh(
             right_interp = _interpolate_levels(
                 center_col, right_col,  resolution)
 
-        all_columns = [left_col] + left_interp + \
-            [center_col] + right_interp + [right_col]
-        _fill_columns(all_columns, len(chains[i]), len(
-            chains[i]), vert_list, face_list, uv_list)
+        # Panel i's left boundary holds the same positions as panel i-1's
+        # right boundary; keep one column (the longer) so the panels share
+        # vertices instead of leaving a seam.
+        if strip_columns:
+            if len(left_col) > len(strip_columns[-1]):
+                strip_columns[-1] = left_col
+        else:
+            strip_columns.append(left_col)
+        strip_columns += left_interp + [center_col] + right_interp + [right_col]
+
+    if use_loop:
+        # The last right boundary is the first left boundary
+        closing = strip_columns.pop()
+        if len(closing) > len(strip_columns[0]):
+            strip_columns[0] = closing
+    _fill_columns(strip_columns, len(chains[0]), len(chains[-1]),
+                  vert_list, face_list, uv_list, close_loop=use_loop)
 
 
 # ---------------------------------------------------------------------------
@@ -991,11 +1042,32 @@ def _create_mesh_object(
 def _assign_uvs(
     mesh_obj: "bpy.types.Object",
     uv_list: list[tuple[float, float]],
+    wrap_u: bool = False,
 ) -> None:
-    """Assign per-vertex UV coordinates to a newly created mesh object."""
-    uv_layer = mesh_obj.data.uv_layers.new(name="UVMap")
-    for loop in mesh_obj.data.loops:
-        uv_layer.data[loop.index].uv = uv_list[loop.vertex_index]
+    """
+    Assign per-vertex UV coordinates to a newly created mesh object.
+
+    Parameters
+    ----------
+    mesh_obj : bpy.types.Object
+        The mesh object; a "UVMap" layer is added to its mesh.
+    uv_list : list of tuple of float
+        One (u, v) per vertex, by vertex index.
+    wrap_u : bool, optional
+        The mesh is a closed loop whose first column has u = 0. A face whose u
+        values span more than 0.5 crosses that seam, so its corners with
+        u < 0.5 get u + 1 and the face runs up to u = 1.
+    """
+    mesh = mesh_obj.data
+    uv_layer = mesh.uv_layers.new(name="UVMap")
+    for poly in mesh.polygons:
+        loop_indices = range(poly.loop_start, poly.loop_start + poly.loop_total)
+        uvs = [uv_list[mesh.loops[li].vertex_index] for li in loop_indices]
+        us = [u for u, _ in uvs]
+        if wrap_u and max(us) - min(us) > 0.5:
+            uvs = [(u + 1.0 if u < 0.5 else u, v) for u, v in uvs]
+        for li, uv in zip(loop_indices, uvs):
+            uv_layer.data[li].uv = uv
 
 
 # ---------------------------------------------------------------------------
@@ -1137,7 +1209,10 @@ def _apply_post_processing(
     if props.mesh_add_subsurf:
         _apply_subsurf(obj, props.mesh_subsurf_levels)
     if uvs:
-        _assign_uvs(obj, uvs)
+        # Only a Connected Loop of 3 or more chains is closed (see use_loop
+        # in _cross_section_mesh)
+        _assign_uvs(obj, uvs, wrap_u=(
+            props.mesh_mode == 'SURFACE_LOOP' and len(chains_used) >= 3))
     if props.mesh_auto_rig:
         _assign_bone_vertex_groups(
             obj, verts, chains_used, props.mesh_envelope_factor)
