@@ -140,6 +140,9 @@ Result:
 │  ├─ mesh_gen_ops.py
 │  ├─ rig_from_mesh_ops.py
 │  └─ vg_select_ops.py
+├─ tests/
+│  ├─ run_tests.py
+│  └─ test_*.py
 └─ ui/
    └─ panel.py
 ```
@@ -277,6 +280,9 @@ Result:
 │  ├─ mesh_gen_ops.py
 │  ├─ rig_from_mesh_ops.py
 │  └─ vg_select_ops.py
+├─ tests/
+│  ├─ run_tests.py
+│  └─ test_*.py
 └─ ui/
    └─ panel.py
 ```
