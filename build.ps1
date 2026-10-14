@@ -1,71 +1,87 @@
-# build.ps1 - Package RigWeaver addon for Blender 4.5+ Extensions distribution
-#
-# Usage:
-#   .\build.ps1
-# Or if execution policy is restrictive:
-#   powershell -ExecutionPolicy Bypass -File build.ps1
+﻿<#
+.SYNOPSIS
+    Builds the installable zip of the RigWeaver extension.
 
-$ProjectRoot = $PSScriptRoot
-$ManifestPath = Join-Path $ProjectRoot "blender_manifest.toml"
+.DESCRIPTION
+    Runs Blender's own extension build on the src folder, writes the zip to the
+    dist folder next to this script, and checks that the zip installs cleanly:
+    blender_manifest.toml and __init__.py at the top, no __pycache__ folders.
+    The zip is named <id>-<version>.zip from src\blender_manifest.toml.
 
-# Read version from manifest
-$ManifestContent = Get-Content $ManifestPath -Raw
-if ($ManifestContent -match '(?m)^version\s*=\s*"([^"]+)"') {
-    $Version = $Matches[1]
-} else {
-    Write-Error "Could not parse version from blender_manifest.toml"
+.PARAMETER Blender
+    Path to blender.exe (Blender 4.2 or later).
+
+.EXAMPLE
+    .\build.ps1
+
+.EXAMPLE
+    .\build.ps1 -Blender "C:\Program Files\Blender Foundation\Blender 4.5\blender.exe"
+#>
+param(
+    [string]$Blender = 'E:\Program Files Portable\blender-4.5.0-windows-x64\blender.exe'
+)
+
+$ErrorActionPreference = 'Stop'
+
+$sourceDir = Join-Path $PSScriptRoot 'src'
+$distDir = Join-Path $PSScriptRoot 'dist'
+$manifestPath = Join-Path $sourceDir 'blender_manifest.toml'
+
+if (-not (Test-Path -LiteralPath $Blender -PathType Leaf)) {
+    Write-Host "Blender not found at: $Blender" -ForegroundColor Red
+    Write-Host 'Pass its location with -Blender "<path to blender.exe>".'
     exit 1
 }
 
-# Use manifest display name for artifact naming, normalized for filesystem safety.
-if ($ManifestContent -match 'name\s*=\s*"([^"]+)"') {
-    $AddonName = $Matches[1]
-} else {
-    $AddonName = "addon"
+# Expected zip name, from the manifest's id and version
+$manifest = Get-Content -LiteralPath $manifestPath -Raw
+$id = [regex]::Match($manifest, '(?m)^\s*id\s*=\s*"([^"]+)"').Groups[1].Value
+$version = [regex]::Match($manifest, '(?m)^\s*version\s*=\s*"([^"]+)"').Groups[1].Value
+if (-not $id -or -not $version) {
+    Write-Host "Could not read id and version from $manifestPath" -ForegroundColor Red
+    exit 1
+}
+$zipPath = Join-Path $distDir "$id-$version.zip"
+
+New-Item -ItemType Directory -Force -Path $distDir | Out-Null
+if (Test-Path -LiteralPath $zipPath) {
+    Remove-Item -LiteralPath $zipPath -Force
 }
 
-$NormalizedAddonName = $AddonName -replace '[^A-Za-z0-9]+', '_'
-$NormalizedAddonName = $NormalizedAddonName -replace '_+', '_'
-$NormalizedAddonName = $NormalizedAddonName.Trim('_')
-if ([string]::IsNullOrWhiteSpace($NormalizedAddonName)) {
-    $NormalizedAddonName = "addon"
+& $Blender --factory-startup --command extension build --source-dir $sourceDir --output-dir $distDir
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Build failed (Blender exit code $LASTEXITCODE)." -ForegroundColor Red
+    exit $LASTEXITCODE
+}
+if (-not (Test-Path -LiteralPath $zipPath)) {
+    Write-Host "Build finished but $zipPath was not created." -ForegroundColor Red
+    exit 1
 }
 
-$OutputName = "${NormalizedAddonName}_v$Version.zip"
-$OutputPath = Join-Path $ProjectRoot $OutputName
-
-# Remove existing zip with the same name
-if (Test-Path $OutputPath) {
-    Remove-Item $OutputPath -Force
-    Write-Host "Removed existing $OutputName"
+# Check the layout Blender's "Install from Disk" needs
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$zip = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
+try {
+    $entries = @($zip.Entries | ForEach-Object { $_.FullName })
+}
+finally {
+    $zip.Dispose()
+}
+$problems = @()
+foreach ($required in 'blender_manifest.toml', '__init__.py') {
+    if ($entries -notcontains $required) {
+        $problems += "$required is not at the top of the zip"
+    }
+}
+if ($entries | Where-Object { $_ -like '*__pycache__*' }) {
+    $problems += 'the zip contains __pycache__ folders'
+}
+if ($problems) {
+    $problems | ForEach-Object { Write-Host "Zip check failed: $_" -ForegroundColor Red }
+    exit 1
 }
 
-# Stage files in a temp directory so Compress-Archive produces a flat zip root
-# (Blender 4.x Extensions require no wrapping folder inside the zip)
-$TempDir = Join-Path $env:TEMP "blender_bone_util_build"
-if (Test-Path $TempDir) { Remove-Item $TempDir -Recurse -Force }
-New-Item -ItemType Directory -Path $TempDir | Out-Null
-
-# Root files
-Copy-Item (Join-Path $ProjectRoot "__init__.py")           $TempDir
-Copy-Item (Join-Path $ProjectRoot "blender_manifest.toml") $TempDir
-Copy-Item (Join-Path $ProjectRoot "translations.py")       $TempDir
-
-# Subdirectories - copy only .py files (excludes __pycache__, *.pyc, etc.)
-foreach ($Dir in @("operators", "ui")) {
-    $DestDir = Join-Path $TempDir $Dir
-    New-Item -ItemType Directory -Path $DestDir | Out-Null
-    Get-ChildItem (Join-Path $ProjectRoot $Dir) -Filter "*.py" |
-        Copy-Item -Destination $DestDir
-}
-
-# Count staged files
-$StagedFiles = (Get-ChildItem $TempDir -Recurse -File).Count
-
-# Zip the contents (wildcard avoids creating a wrapper folder in the zip)
-Compress-Archive -Path "$TempDir\*" -DestinationPath $OutputPath
-
-# Clean up temp directory
-Remove-Item $TempDir -Recurse -Force
-
-Write-Host "Built: $OutputPath ($StagedFiles files)"
+Write-Host ''
+Write-Host "Built $zipPath ($($entries.Count) files)" -ForegroundColor Green
+Write-Host 'Install: Blender > Edit > Preferences > Get Extensions > menu at the top right > Install from Disk.'
+exit 0

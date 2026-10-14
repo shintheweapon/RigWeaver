@@ -7,3 +7,6 @@ __pycache__/
 Thumbs.db
 *.zip
 .claude/
+
+# Build output
+dist/

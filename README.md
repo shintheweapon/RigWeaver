@@ -16,23 +16,23 @@ RigWeaver helps you:
 ### 1. Requirements
 
 - Blender 4.5.0+
-- RigWeaver extension package (`RigWeaver_v<version>.zip`)
+- RigWeaver extension package (`distig_weaver-<version>.zip`)
 - Optional: NumPy (needed for some AUTO/TREE features)
 - Optional: GPU support for viewport preview overlays
 
 ### 2. Install
 
 1. Build package:
-   - Run `./build.ps1` in repo root (PowerShell).
+   - Run `.uild.ps1` in the repo folder (PowerShell).
 2. Install in Blender:
-   - `Edit > Preferences > Extensions > Install from File`
-   - Select generated zip: `RigWeaver_v<version>.zip`.
-   - Or drag and drop the `RigWeaver_v<version>.zip` into view port.
+   - `Edit > Preferences > Get Extensions`, menu at the top right, `Install from Disk`
+   - Select the built zip: `distig_weaver-<version>.zip`.
+   - Or drag and drop `rig_weaver-<version>.zip` into the viewport.
 3. Open `3D Viewport > Sidebar (N) > RigWeaver`.
 
-Note:
+Build:
 
-- The build script derives the zip base name from `blender_manifest.toml` `name`, then normalises non-alphanumeric characters to `_`.
+- `build.ps1` runs Blender's extension build on `src` and writes `distig_weaver-<version>.zip`, then checks the zip's layout. Pass `-Blender "<path to blender.exe>"` when Blender is elsewhere.
 
 ### 3. Main Workflows
 
@@ -145,21 +145,23 @@ Result:
 
 ```python
 .
-├─ __init__.py
-├─ blender_manifest.toml
 ├─ build.ps1
-├─ translations.py
-├─ operators/
-│  ├─ extract_ops.py
-│  ├─ mesh_gen_ops.py
-│  ├─ rig_from_mesh_ops.py
-│  ├─ vg_select_ops.py
-│  └─ weight_transfer_ops.py
-├─ tests/
-│  ├─ run_tests.py
-│  └─ test_*.py
-└─ ui/
-   └─ panel.py
+├─ dist/
+├─ src/
+│  ├─ __init__.py
+│  ├─ blender_manifest.toml
+│  ├─ translations.py
+│  ├─ operators/
+│  │  ├─ extract_ops.py
+│  │  ├─ mesh_gen_ops.py
+│  │  ├─ rig_from_mesh_ops.py
+│  │  ├─ vg_select_ops.py
+│  │  └─ weight_transfer_ops.py
+│  └─ ui/
+│     └─ panel.py
+└─ tests/
+   ├─ run_tests.py
+   └─ test_*.py
 ```
 
 ---
@@ -169,23 +171,23 @@ Result:
 ### 1. 环境要求
 
 - Blender 4.5.0+
-- RigWeaver 扩展包（`RigWeaver_v<version>.zip`）
+- RigWeaver 扩展包（`distig_weaver-<version>.zip`）
 - 可选：NumPy（部分 AUTO/TREE 功能需要）
 - 可选：GPU 预览叠加支持
 
 ### 2. 安装
 
 1. 打包：
-   - 在仓库根目录运行 `./build.ps1`（PowerShell）。
+   - 在仓库文件夹中运行 `.uild.ps1`（PowerShell）。
 2. 在 Blender 安装：
-   - `编辑 > 偏好设置 > 扩展 > 从文件安装`
-   - 选择生成的 zip：`RigWeaver_v<version>.zip`。
-   - 或者拖拽`RigWeaver_v<version>.zip`到 Blender。
+   - `编辑 > 偏好设置 > 获取扩展`，右上角菜单，`从磁盘安装`
+   - 选择生成的 zip：`distig_weaver-<version>.zip`。
+   - 或者拖拽 `rig_weaver-<version>.zip` 到 Blender。
 3. 打开 `3D 视图 > 侧边栏(N) > RigWeaver`。
 
-说明：
+构建：
 
-- 构建脚本会从 `blender_manifest.toml` 的 `name` 字段生成 zip 名称，并将非字母数字字符规范化为 `_`。
+- `build.ps1` 对 `src` 运行 Blender 的扩展构建，生成 `distig_weaver-<version>.zip`，并检查 zip 的结构。Blender 不在默认位置时，用 `-Blender "<blender.exe 的路径>"` 指定。
 
 ### 3. 核心流程
 
@@ -300,19 +302,21 @@ Result:
 
 ```python
 .
-├─ __init__.py
-├─ blender_manifest.toml
 ├─ build.ps1
-├─ translations.py
-├─ operators/
-│  ├─ extract_ops.py
-│  ├─ mesh_gen_ops.py
-│  ├─ rig_from_mesh_ops.py
-│  ├─ vg_select_ops.py
-│  └─ weight_transfer_ops.py
-├─ tests/
-│  ├─ run_tests.py
-│  └─ test_*.py
-└─ ui/
-   └─ panel.py
+├─ dist/
+├─ src/
+│  ├─ __init__.py
+│  ├─ blender_manifest.toml
+│  ├─ translations.py
+│  ├─ operators/
+│  │  ├─ extract_ops.py
+│  │  ├─ mesh_gen_ops.py
+│  │  ├─ rig_from_mesh_ops.py
+│  │  ├─ vg_select_ops.py
+│  │  └─ weight_transfer_ops.py
+│  └─ ui/
+│     └─ panel.py
+└─ tests/
+   ├─ run_tests.py
+   └─ test_*.py
 ```

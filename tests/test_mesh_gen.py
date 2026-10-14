@@ -7,7 +7,7 @@ import bpy
 import numpy as np
 from mathutils import Vector
 
-from blender_bone_util.operators import mesh_gen_ops
+from src.operators import mesh_gen_ops
 
 
 def new_scene():
