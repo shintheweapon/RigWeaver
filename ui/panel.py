@@ -262,6 +262,59 @@ class VIEW3D_PT_rig_from_mesh(Panel):
         )
 
 
+class VIEW3D_PT_weight_transfer(Panel):
+    """RigWeaver: copy deform bone weights from a source mesh to the active mesh."""
+    # Same header as VIEW3D_PT_rig_from_mesh; the box names the tool
+    bl_label = "RigWeaver"
+    bl_idname = "VIEW3D_PT_weight_transfer"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "RigWeaver"
+
+    @classmethod
+    def poll(cls, context):
+        return context.object is not None and context.object.type == 'MESH'
+
+    def draw(self, context):
+        layout = self.layout
+        props = context.scene.rig_weaver_props
+        obj = context.object
+
+        box = layout.box()
+        row = box.row()
+        row.prop(
+            props, "ui_expand_transfer",
+            icon='TRIA_DOWN' if props.ui_expand_transfer else 'TRIA_RIGHT',
+            icon_only=True, emboss=False,
+        )
+        row.label(text=iface_("Transfer Weights"), icon='MOD_DATA_TRANSFER')
+
+        if not props.ui_expand_transfer:
+            return
+
+        if obj.mode != 'OBJECT':
+            box.label(text=iface_("Requires Object Mode"), icon='INFO')
+            box.operator(
+                "object.mode_set", text=iface_("Enter Object Mode"),
+                icon='OBJECT_DATA',
+            ).mode = 'OBJECT'
+            return
+
+        col = box.column()
+        col.use_property_split = True
+        col.use_property_decorate = False
+        col.prop(props, "transfer_source")
+        col.prop(props, "transfer_vert_mapping")
+
+        box.prop(props, "transfer_normalize")
+        box.prop(props, "transfer_add_armature")
+
+        row = box.row()
+        row.scale_y = 1.3
+        row.operator("rig_weaver.transfer_weights",
+                     text=iface_("Transfer Weights"), icon='MOD_DATA_TRANSFER')
+
+
 class VIEW3D_PT_vg_select(Panel):
     """RigWeaver — Vertex Group Multi-Select (active mesh in Edit Mode)."""
     bl_label = "Vertex Group Select"
@@ -338,11 +391,13 @@ def register():
     bpy.utils.register_class(RIG_WEAVER_UL_vg_list)
     bpy.utils.register_class(VIEW3D_PT_rig_weaver)
     bpy.utils.register_class(VIEW3D_PT_rig_from_mesh)
+    bpy.utils.register_class(VIEW3D_PT_weight_transfer)
     bpy.utils.register_class(VIEW3D_PT_vg_select)
 
 
 def unregister():
     bpy.utils.unregister_class(VIEW3D_PT_vg_select)
+    bpy.utils.unregister_class(VIEW3D_PT_weight_transfer)
     bpy.utils.unregister_class(VIEW3D_PT_rig_from_mesh)
     bpy.utils.unregister_class(VIEW3D_PT_rig_weaver)
     bpy.utils.unregister_class(RIG_WEAVER_UL_vg_list)

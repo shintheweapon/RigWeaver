@@ -12,7 +12,9 @@ from __future__ import annotations
 import json
 
 import bpy
-from bpy.props import BoolProperty, EnumProperty, FloatProperty, IntProperty, StringProperty
+from bpy.props import (
+    BoolProperty, EnumProperty, FloatProperty, IntProperty, PointerProperty, StringProperty,
+)
 from bpy.types import Operator, PropertyGroup
 from mathutils import Vector
 
@@ -33,6 +35,11 @@ def _on_auto_rig_update(self, context):
     if not self.mesh_auto_rig and self.ui_envelope_preview_active:
         from . import mesh_gen_ops
         mesh_gen_ops.deactivate_envelope_preview(self, context)
+
+
+def _is_mesh(self, obj):
+    """Allow only mesh objects as the weight transfer source."""
+    return obj.type == 'MESH'
 
 
 def _on_mesh_prop_update(self, context):
@@ -345,6 +352,54 @@ class RigWeaverProperties(PropertyGroup):
         name="Rig Preview Active",
         description="Whether the rig cage preview overlay is currently displayed",
         default=False,
+    )
+
+    # ── Transfer Weights ──────────────────────────────────────────────────────
+    transfer_source: PointerProperty(
+        name="Source",
+        description="Mesh whose deform bone weights are copied to the active mesh",
+        type=bpy.types.Object,
+        poll=_is_mesh,
+    )
+    # Blender's own vertex mapping choices (Data Transfer), same names
+    transfer_vert_mapping: EnumProperty(
+        name="Vertex Mapping",
+        description="How each target vertex finds its source weights",
+        items=[
+            ('TOPOLOGY', "Topology",
+             "Copy from identical topology meshes"),
+            ('NEAREST', "Nearest Vertex",
+             "Copy from closest vertex"),
+            ('EDGE_NEAREST', "Nearest Edge Vertex",
+             "Copy from closest vertex of closest edge"),
+            ('EDGEINTERP_NEAREST', "Nearest Edge Interpolated",
+             "Copy from interpolated values of vertices from closest point on closest edge"),
+            ('POLY_NEAREST', "Nearest Face Vertex",
+             "Copy from closest vertex of closest face"),
+            ('POLYINTERP_NEAREST', "Nearest Face Interpolated",
+             "Copy from interpolated values of vertices from closest point on closest face"),
+            ('POLYINTERP_VNORPROJ', "Projected Face Interpolated",
+             "Copy from interpolated values of vertices from point on closest face hit by "
+             "normal-projection"),
+        ],
+        default='POLYINTERP_NEAREST',
+    )
+    transfer_normalize: BoolProperty(
+        name="Normalize Weights",
+        description="Make the copied bone weights of each vertex add up to 1",
+        default=True,
+    )
+    transfer_add_armature: BoolProperty(
+        name="Add Armature Modifier",
+        description=(
+            "Point an Armature modifier on the active mesh at the source's armature, "
+            "reusing one that already does"
+        ),
+        default=True,
+    )
+    ui_expand_transfer: BoolProperty(
+        name="Transfer Weights",
+        default=True,
     )
 
 
